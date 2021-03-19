@@ -5,7 +5,7 @@
 # Optionally we can provide the inden script
 # as second argument.
 #
-# The return value of this script is 0 if the 
+# The return value of this script is 0 if the
 # file is properly indented and not 0 if it is not.
 #
 # Copyright Johannes Holke 2020
