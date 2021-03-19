@@ -18,7 +18,7 @@ usage="$0 FILENAME [INDENT_SCRIPT]"
 #
 if [ `basename $PWD` != scripts ]
 then
-  echo ERROR: Must be executed from whitin the scripts/ subfolder.
+  echo ERROR: Must be executed from whitin the scripts/ subfolder. 2>&1
   exit 1
 fi
 
