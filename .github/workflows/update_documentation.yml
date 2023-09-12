@@ -91,7 +91,7 @@ jobs:
     - name: check_diff
       run: |
         cd t8code-website
-        echo "COMMIT_NEW_DOC=true" >> $GITHUB_ENV
+        if [ ! -z "$(git status --porcelain --untracked-files=no )" ]; then echo "COMMIT_NEW_DOC=true" >> $GITHUB_ENV; fi
     - name: Commit and push files
       if: ${{ env.COMMIT_NEW_DOC == 'true' }}
       run: |
