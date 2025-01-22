@@ -19,7 +19,7 @@ libt8_installed_headers_default_line += \
 libt8_installed_headers_default_quad += \
   src/t8_schemes/t8_default/t8_default_quad/t8_default_quad.hxx \
   src/t8_schemes/t8_default/t8_default_quad/t8_dquad.h \
-  src/t8_schemes/t8_default/t8_default_quad/t8_dquad_bits.h
+  src/t8_schemes/t8_default/t8_default_quad/t8_default_quad_bits.hxx
 libt8_installed_headers_default_tri += \
   src/t8_schemes/t8_default/t8_default_tri/t8_default_tri.hxx \
   src/t8_schemes/t8_default/t8_default_tri/t8_dtri.h \
@@ -46,7 +46,6 @@ libt8_installed_headers_default_pyramid += \
   src/t8_schemes/t8_default/t8_default_pyramid/t8_dpyramid_connectivity.h
 libt8_compiled_sources += \
   src/t8_schemes/t8_default/t8_default.cxx \
-  src/t8_schemes/t8_default/t8_default_common/t8_default_common.cxx \
   src/t8_schemes/t8_default/t8_default_hex/t8_default_hex.cxx \
   src/t8_schemes/t8_default/t8_default_hex/t8_dhex_bits.c \
   src/t8_schemes/t8_default/t8_default_line/t8_default_line.cxx \
@@ -54,7 +53,7 @@ libt8_compiled_sources += \
   src/t8_schemes/t8_default/t8_default_prism/t8_default_prism.cxx \
   src/t8_schemes/t8_default/t8_default_prism/t8_dprism_bits.c \
   src/t8_schemes/t8_default/t8_default_quad/t8_default_quad.cxx \
-  src/t8_schemes/t8_default/t8_default_quad/t8_dquad_bits.c \
+  src/t8_schemes/t8_default/t8_default_quad/t8_default_quad_bits.cxx \
   src/t8_schemes/t8_default/t8_default_tet/t8_default_tet.cxx \
   src/t8_schemes/t8_default/t8_default_tet/t8_dtet_bits.c \
   src/t8_schemes/t8_default/t8_default_tet/t8_dtet_connectivity.c \

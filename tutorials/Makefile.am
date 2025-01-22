@@ -14,7 +14,8 @@ bin_PROGRAMS += \
 	tutorials/general/t8_step7_interpolation \
 	tutorials/general/t8_tutorial_build_cmesh \
 	tutorials/general/t8_tutorial_search \
-	tutorials/features/t8_features_curved_meshes
+	tutorials/features/t8_features_curved_meshes \
+	tutorials/thesis/thesis_mesh
 
 dist_t8data_DATA += \
   tutorials/features/t8_features_curved_meshes_generate_cmesh_hex.geo \
@@ -41,6 +42,7 @@ tutorials_general_t8_step5_element_data_SOURCES = \
 	tutorials/general/t8_step5_main.cxx
 tutorials_general_t8_step5_element_data_c_interface_SOURCES = \
 	tutorials/general/t8_step3_adapt_forest.cxx \
+	tutorials/general/t8_step3_adapt_forest.cxx \
 	tutorials/general/t8_step5_element_data_c_interface.c \
 	tutorials/general/t8_step5_main.cxx
 tutorials_general_t8_step6_stencil_SOURCES = \
@@ -59,6 +61,13 @@ tutorials_general_t8_tutorial_search_SOURCES = \
 	tutorials/general/t8_step3_adapt_forest.cxx
 tutorials_features_t8_features_curved_meshes_SOURCES = \
   tutorials/features/t8_features_curved_meshes.cxx
+tutorials_thesis_thesis_mesh_SOURCES = \
+	tutorials/thesis/thesis_mesh.cxx \
+	tutorials/thesis/thesis_mesh_main.cxx \
+	tutorials/thesis/dunavant.cpp \
+	tutorials/thesis/vecmat.cpp \
+	tutorials/thesis/basis_functions.cpp \
+	tutorials/thesis/mask_coefficients.cpp
 
 libt8_installed_headers += \
         tutorials/general/t8_step3.h \
@@ -66,4 +75,10 @@ libt8_installed_headers += \
         tutorials/general/t8_step5.h \
         tutorials/general/t8_step6.h \
         tutorials/general/t8_step7.h \
-        tutorials/general/t8_tutorial_build_cmesh.h
+        tutorials/general/t8_tutorial_build_cmesh.h \
+				tutorials/thesis/vecmat.hpp \
+        tutorials/thesis/thesis_mesh.hpp \
+				tutorials/thesis/basis_functions.hpp \
+				tutorials/thesis/dunavant.hpp \
+				tutorials/thesis/mask_coefficients.hpp \
+				tutorials/thesis/wavelet.hpp
