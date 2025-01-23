@@ -331,7 +331,7 @@ t8_cmesh_new_basic (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
   /* 3. Definition of the geometry */
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
   ; /* Use linear geometry */
 
   /* 4. Definition of the classes of the different trees */
@@ -389,7 +389,7 @@ t8_cmesh_new_debugging (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
   /* 3. Definition of the geometry */
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
   ; /* Use linear geometry */
 
   /* 4. Definition of the classes of the different trees */
@@ -439,7 +439,7 @@ t8_cmesh_new_octagon (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
   /* 3. Definition of the geometry */
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
   ; /* Use linear geometry */
 
   /* 4. Definition of the classes of the different trees */
@@ -522,7 +522,7 @@ t8_cmesh_new_complex_polygonal_shape (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
   /* 3. Definition of the geometry */
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
   ; /* Use linear geometry */
 
   /* 4. Definition of the classes of the different trees */
@@ -582,7 +582,7 @@ t8_cmesh_new_l_shape (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
   /* 3. Definition of the geometry */
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
   /* Use linear geometry */
 
   /* 4. Definition of the classes of the different trees */
@@ -627,7 +627,7 @@ t8_cmesh_new_earth (sc_MPI_Comm comm)
   t8_cmesh_init (&cmesh);
 
 
-  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh, 2);
+  t8_cmesh_register_geometry<t8_geometry_linear> (cmesh);
 
 
 
@@ -3338,52 +3338,6 @@ t8_adapt_forest (t8_forest_t forest_from, t8_forest_adapt_t adapt_fn, int do_par
   return forest_new;
 }
 
-/* Replace callback to decide how to interpolate a refined or coarsened element.
- * If an element is refined, each child gets the value of its parent.
- * If elements are coarsened, the parent gets the average value of the children.
- * Outgoing are the old elements and incoming the new ones
- * \param [in] forest_old        non adapted forest
- * \param [in] forest_new        adapted forest
- * \param [in] which_tree        tree_id of the analyzed element
- * \param [in] ts                eclass scheme
- * \param [in] refine            ==0 - do nothing, == -1 - coarsen, == 1 - refine
- * \param [in] num_outgoing      number of the elements not refined forest
- * \param [in] first_outgoing    index of the old element
- * \param [in] num_incoming      number of the elements corresponding to the element of the not refined forest
- * \param [in] first_incoming    index of the new element
-
- */
-// void
-// t8_forest_replace_alt (t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree, const t8_scheme *ts,
-//                    int refine, int num_outgoing, t8_locidx_t first_outgoing, int num_incoming,
-//                    t8_locidx_t first_incoming)
-// {
-//   struct lmi_adapt *adapt_data_new = (struct lmi_adapt *) t8_forest_get_user_data (forest_new);
-//   struct lmi_adapt *adapt_data_old= (struct lmi_adapt *) t8_forest_get_user_data (forest_old);
-//
-//   /* get the index of the data array corresponding to the old and the adapted forest */
-//   first_incoming += t8_forest_get_tree_element_offset (forest_new, which_tree);
-//   first_outgoing += t8_forest_get_tree_element_offset (forest_old, which_tree);
-//   int basecell_num_digits_offset=countDigit(t8_forest_get_num_global_trees (forest_old)-1)-1;
-//
-//   /* Do not adapt or coarsen */
-//   if (refine == 0) {
-//     adapt_data_new->adapt_lmi_data[first_incoming].lmi.lmi_arr[0]=adapt_data_old->adapt_lmi_data[first_outgoing].lmi.lmi_arr[0];
-//     adapt_data_new->adapt_lmi_data[first_incoming].lmi.lmi_arr[1]=adapt_data_old->adapt_lmi_data[first_outgoing].lmi.lmi_arr[1];
-//     adapt_data_new->adapt_lmi_data[first_incoming].lmi.lmi_arr[2]=adapt_data_old->adapt_lmi_data[first_outgoing].lmi.lmi_arr[2];
-//   }
-//   /* The old element is refined, we copy the element values */
-//   else if (refine == 1) {
-//     for (int i = 0; i < num_incoming; i++) {
-//       struct lmi child_i=get_jth_child_lmi(i, adapt_data_old->adapt_lmi_data[first_outgoing].lmi,basecell_num_digits_offset);
-//       adapt_data_new->adapt_lmi_data[first_incoming+i].lmi.lmi_arr[0]=child_i.lmi_arr[0];
-//       adapt_data_new->adapt_lmi_data[first_incoming+i].lmi.lmi_arr[1]=child_i.lmi_arr[1];
-//       adapt_data_new->adapt_lmi_data[first_incoming+i].lmi.lmi_arr[2]=child_i.lmi_arr[2];
-//
-//     }
-//   }
-//   t8_forest_set_user_data (forest_new, adapt_data_new);
-// }
 
 /* Replace callback to decide how to interpolate a refined or coarsened element.
  * If an element is refined, each child gets the value of its parent.
@@ -3400,7 +3354,7 @@ t8_adapt_forest (t8_forest_t forest_from, t8_forest_adapt_t adapt_fn, int do_par
  * \param [in] first_incoming    index of the new element
  */
 void
-t8_forest_replace (t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree, const t8_scheme *ts,
+t8_forest_replace (t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree, const t8_eclass_t tree_class,const t8_scheme *ts,
                    int refine, int num_outgoing, t8_locidx_t first_outgoing, int num_incoming,
                    t8_locidx_t first_incoming)
 {
@@ -6858,7 +6812,7 @@ double ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_waveletfree_3d i
 //   return initial_grid_hierarchy;
 // }
 
-struct grid_hierarchy initialize_grid_hierarchy(t8_cmesh_t cmesh,t8_scheme * scheme,func F,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy initialize_grid_hierarchy(t8_cmesh_t cmesh,const t8_scheme * scheme,func F,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6867,7 +6821,7 @@ struct grid_hierarchy initialize_grid_hierarchy(t8_cmesh_t cmesh,t8_scheme * sch
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_3d initialize_grid_hierarchy_3d(t8_cmesh_t cmesh,t8_scheme * scheme,func F1,func F2,func F3,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_3d initialize_grid_hierarchy_3d(t8_cmesh_t cmesh,const t8_scheme * scheme,func F1,func F2,func F3,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_3d initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6876,7 +6830,7 @@ struct grid_hierarchy_3d initialize_grid_hierarchy_3d(t8_cmesh_t cmesh,t8_scheme
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree(t8_cmesh_t cmesh,t8_scheme * scheme,func F,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree(t8_cmesh_t cmesh,const t8_scheme * scheme,func F,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_waveletfree initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6885,7 +6839,7 @@ struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree(t8_cmesh
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_waveletfree_3d initialize_grid_hierarchy_waveletfree_3d(t8_cmesh_t cmesh,t8_scheme * scheme,func F1,func F2,func F3,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_waveletfree_3d initialize_grid_hierarchy_waveletfree_3d(t8_cmesh_t cmesh,const t8_scheme * scheme,func F1,func F2,func F3,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6894,7 +6848,7 @@ struct grid_hierarchy_waveletfree_3d initialize_grid_hierarchy_waveletfree_3d(t8
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy initialize_grid_hierarchy_spline(t8_cmesh_t cmesh,t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy initialize_grid_hierarchy_spline(t8_cmesh_t cmesh,const t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6903,7 +6857,7 @@ struct grid_hierarchy initialize_grid_hierarchy_spline(t8_cmesh_t cmesh,t8_schem
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_3d initialize_grid_hierarchy_3d_spline(t8_cmesh_t cmesh,t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline_d1,const gsl_spline2d *spline_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_3d initialize_grid_hierarchy_3d_spline(t8_cmesh_t cmesh,const t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline_d1,const gsl_spline2d *spline_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_3d initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6912,7 +6866,7 @@ struct grid_hierarchy_3d initialize_grid_hierarchy_3d_spline(t8_cmesh_t cmesh,t8
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree_spline(t8_cmesh_t cmesh,t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree_spline(t8_cmesh_t cmesh,const t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_waveletfree initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -6921,7 +6875,7 @@ struct grid_hierarchy_waveletfree initialize_grid_hierarchy_waveletfree_spline(t
   return initial_grid_hierarchy;
 }
 
-struct grid_hierarchy_waveletfree_3d initialize_grid_hierarchy_waveletfree_3d_spline(t8_cmesh_t cmesh,t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline_d1,const gsl_spline2d *spline_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3,sc_MPI_Comm comm, const int rule, const int max_level){
+struct grid_hierarchy_waveletfree_3d initialize_grid_hierarchy_waveletfree_3d_spline(t8_cmesh_t cmesh,const t8_scheme * scheme,spline eval_spline,const gsl_spline2d *spline_d1,const gsl_spline2d *spline_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3,sc_MPI_Comm comm, const int rule, const int max_level){
   struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy;
   for (int level=0; level < max_level+1; ++level) {
     initial_grid_hierarchy.lev_arr[level].forest_arr=t8_forest_new_uniform (cmesh, scheme, level, 0, comm);
@@ -7007,8 +6961,9 @@ void deref_grid_hierarchy_3d_wf(struct grid_hierarchy_waveletfree_3d initial_gri
 }
 
 int
-t8_msa_adapt_callback (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-                         const t8_scheme *ts, const int is_family, const int num_elements, t8_element_t *elements[])
+t8_msa_adapt_callback (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, const t8_eclass_t tree_class,
+                       t8_locidx_t lelement_id,const t8_scheme *ts, const int is_family, const int num_elements,
+                       t8_element_t *elements[])
 {
   /* Our adaptation criterion is to look at whether cells have significant local contributions, then we marked them as adaptiert. */
 
@@ -7033,35 +6988,6 @@ t8_msa_adapt_callback (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t 
   }
   return 0;
 }
-
-// int
-// t8_msa_adapt_callback_alt (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-//                          const t8_scheme *ts, const int is_family, const int num_elements, t8_element_t *elements[])
-// {
-//   /* Our adaptation criterion is to look at whether cells have significant local contributions, then we marked them as adaptiert. */
-//
-//   /* access user with t8_forest_get_user_data (forest). */
-//   struct lmi_adapt * adapt_data = (struct lmi_adapt *) t8_forest_get_user_data (forest);
-//
-//   /* Offset is first element index in tree. */
-//   t8_locidx_t offset = t8_forest_get_tree_element_offset (forest_from, which_tree);
-//   /* From this we calculate the local element id. */
-//   t8_locidx_t elem_id=lelement_id + offset;
-//   int basecell_num_digits_offset=countDigit(t8_forest_get_num_global_trees (forest_from)-1)-1;
-//
-//   /* You can use T8_ASSERT for assertions that are active in debug mode (when configured with --enable-debug).
-//    * If the condition is not true, then the code will abort.
-//    * In this case, we want to make sure that we actually did set a user pointer to forest and thus
-//    * did not get the NULL pointer from t8_forest_get_user_data.
-//    */
-//   t8_locidx_t elem_id_ref=t8_lmi_to_elem_id (adapt_data->adapt_lmi_data[elem_id].lmi,basecell_num_digits_offset);
-//   T8_ASSERT (adapt_data != NULL);
-//   if ((adapt_data->ref_grid_data[elem_id_ref].signifikant)&&(adapt_data->adapt_lmi_data[elem_id].lmi.lmi_arr[1]==adapt_data->ref_grid_data[elem_id_ref].lmi.lmi_arr[1])) {
-//     /* Refine this element. */
-//     return 1;
-//   }
-//   return 0;
-// }
 
 t8_data_per_element_adapt * initialize_lmi_adapt_data_new(t8_forest_t forest_adapt){
   t8_locidx_t num_local_trees;
@@ -7250,7 +7176,7 @@ t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int m
   double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS:%f \n",error);
   InverseMultiScaleOperator(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,,err_type);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS danach:%f \n",error);
   /*
   MultiScaleOperator(initial_grid_hierarchy);
@@ -7292,7 +7218,7 @@ t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int m
   //ThresholdOperatorwaveletfree(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10,err_type);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //ThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //GridAdaptation(initial_grid_hierarchy, c_tresh, 2.0);
@@ -8132,89 +8058,6 @@ VanishingMomentsUnitTest (struct grid_hierarchy grid_hierarchy)
 return num_vanishing_moments;
 }
 
-/*
- * MSA: Multiscaleanalysis: We perform the steps
- * Optionen: Waveletfree oder classical
- */
-void
-VanishingMomentsUnitTestwaveletfree (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh)
-{
-  t8_forest_t forest=initial_grid_hierarchy.lev_arr[0].forest_arr;
-  t8_forest_t forest_adapt;
-  unsigned int anzahl_gesamt;
-  unsigned int anzahl_klein;
-  struct lmi_adapt adapt_data;
-  struct lmi_adapt adapt_data_new;
-  //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
-  //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-
-  MultiScaleOperator(initial_grid_hierarchy);
-  InverseMultiScaleOperator(initial_grid_hierarchy);
-
-  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
-  //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
-
-  HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
-  adapt_data.ref_grid_data= initial_grid_hierarchy.lev_arr[0].data_arr;
-  adapt_data.adapt_lmi_data= initialize_lmi_adapt_data(initial_grid_hierarchy);
-  t8_forest_set_user_data (forest, &adapt_data);
-  T8_ASSERT (t8_forest_is_committed (forest));
-  t8_forest_ref (forest);
-  forest_adapt = t8_adapt_forest (forest, t8_msa_adapt_callback, 0, 0, &adapt_data);
-
-  adapt_data_new.ref_grid_data= initial_grid_hierarchy.lev_arr[0].data_arr;
-  adapt_data_new.adapt_lmi_data= initialize_lmi_adapt_data_new(forest_adapt);
-  t8_forest_set_user_data (forest_adapt, &adapt_data_new);
-  t8_forest_iterate_replace (forest_adapt, forest, t8_forest_replace);
-  /* Write the adapted forest to a vtu file */
-  adapt_data_new = *(struct lmi_adapt *) t8_forest_get_user_data (forest_adapt);
-  //t8_write_vtu (forest_adapt, adapt_data, "t8_step7_adapt_forest");
-
-  /* Free the memory */
-
-  T8_FREE (adapt_data.adapt_lmi_data);
-  adapt_data.adapt_lmi_data=T8_ALLOC(struct t8_data_per_element_adapt,t8_forest_get_local_num_elements (forest_adapt));
-
-  /* Save the new forest as old forest */
-  //t8_scheme_cxx_ref (forest->scheme_cxx);
-  //t8_cmesh_ref (forest->cmesh);
-  t8_forest_ref (initial_grid_hierarchy.lev_arr[0].forest_arr);
-  t8_forest_unref (&forest);
-  forest = forest_adapt;
-  adapt_data = adapt_data_new;
-
-
-  for (int lev=1;lev<max_level;lev++){
-    adapt_data.ref_grid_data= initial_grid_hierarchy.lev_arr[lev].data_arr;
-    t8_forest_set_user_data (forest, &adapt_data);
-    t8_forest_ref (forest);
-    forest_adapt = t8_adapt_forest (forest, t8_msa_adapt_callback, 0, 0, &adapt_data);
-
-    adapt_data_new.ref_grid_data= initial_grid_hierarchy.lev_arr[lev].data_arr;
-    adapt_data_new.adapt_lmi_data= initialize_lmi_adapt_data_new(forest_adapt);
-
-    t8_forest_set_user_data (forest_adapt, &adapt_data_new);
-    t8_forest_iterate_replace (forest_adapt, forest, t8_forest_replace);
-
-    /* Write the adapted forest to a vtu file */
-    struct lmi_adapt *elem_data = (struct lmi_adapt *) t8_forest_get_user_data (forest_adapt);
-
-    //t8_write_vtu (forest_adapt, adapt_data, "t8_step7_adapt_forest");
-    /* Free the memory */
-    T8_FREE (adapt_data.adapt_lmi_data);
-    adapt_data.adapt_lmi_data=T8_ALLOC(struct t8_data_per_element_adapt,t8_forest_get_local_num_elements (forest_adapt));
-
-    /* Save the new forest as old forest */
-    t8_forest_unref (&forest);
-    forest = forest_adapt;
-    adapt_data = adapt_data_new;
-
-  }
-  t8_forest_write_vtk (forest, "adapted_forest");
-  T8_FREE (adapt_data.adapt_lmi_data);
-  T8_FREE (adapt_data.ref_grid_data);
-}
 
 /*
  *
@@ -8510,7 +8353,7 @@ t8_tutorial_build_cmesh_main (int argc, char **argv)
   /* Creation of a basic two dimensional cmesh. */
   t8_cmesh_t cmesh = t8_cmesh_new_debugging (comm);
 
-  t8_scheme  *scheme = t8_scheme_new_default_cxx ();
+  const t8_scheme *scheme = t8_scheme_new_default ();
   int level = max_level;
   //struct grid_hierarchy initial_grid_hierarchy=initialize_grid_hierarchy_spline(cmesh,scheme,AuswertungSpline,spline,xacc,yacc,comm,10,max_level);
 
@@ -8524,7 +8367,7 @@ t8_tutorial_build_cmesh_main (int argc, char **argv)
   struct grid_hierarchy_waveletfree initial_grid_hierarchy=initialize_grid_hierarchy_waveletfree(cmesh,scheme,F,comm, 10,max_level);
 
 
-  t8_msa_wf (F,initial_grid_hierarchy,c_tresh,max_level);
+  t8_msa_wf (F,initial_grid_hierarchy,c_tresh,max_level,"L2");
   //zero_degree_const
   //t8_global_productionf ("Numerical Stability Test %i \n",NumericalStabilityMSOperatorUnitTest(first_degree_x,initial_grid_hierarchy,1e-16, 100));
   //t8_global_productionf ("Number of vanishing moments: %i \n",VanishingMomentsUnitTest (initial_grid_hierarchy));
