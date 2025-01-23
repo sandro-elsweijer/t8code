@@ -5202,11 +5202,6 @@ double AuswertungMultiscaleWaveletfree(struct grid_hierarchy_waveletfree initial
       A.lr_factors(A,r);
       A.lr_solve(A, r, tau_child);
       for (int i = 0; i < M; ++i) {
-        // t8_global_productionf("j:%i \n",j);
-        // t8_global_productionf("current_index:%i \n",current_index);
-        // t8_global_productionf("d koeff:%f \n",initial_grid_hierarchy.lev_arr[level].data_arr[index].d_coeff_wavelet_free[i][j]);
-        // t8_global_productionf("vol:%f \n",volume_child);
-        // t8_global_productionf("skal funk:%f \n",skalierungsfunktion_nextlevel(i, tau_child(0),tau_child(1)));
         sum += initial_grid_hierarchy.lev_arr[level].data_arr[index].d_coeff_wavelet_free[i][j]*sqrt(1./(2.*volume_child))*skalierungsfunktion_nextlevel(i, tau_child(0),tau_child(1));
       }
     }
@@ -5424,7 +5419,7 @@ double ErrorSinglescale(t8_forest_t forest, struct t8_data_per_element *element_
   return sum;
 }
 
-double ErrorSinglescaleSpline(t8_forest_t forest, struct t8_data_per_element *element_data,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule) {
+double ErrorSinglescaleSpline(t8_forest_t forest, struct t8_data_per_element *element_data,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5485,19 +5480,38 @@ double ErrorSinglescaleSpline(t8_forest_t forest, struct t8_data_per_element *el
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = eval_spline(spline,x,y,xacc,yacc) - AuswertungSinglescale(forest,element_data,x,y,itree,ielement,current_index);
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorSinglescale3d(t8_forest_t forest, struct t8_data_per_element_3d *element_data,func F1,func F2,func F3, int rule) {
+double ErrorSinglescale3d(t8_forest_t forest, struct t8_data_per_element_3d *element_data,func F1,func F2,func F3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5516,10 +5530,7 @@ struct double_3d_array ErrorSinglescale3d(t8_forest_t forest, struct t8_data_per
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (forest);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -5556,7 +5567,7 @@ struct double_3d_array ErrorSinglescale3d(t8_forest_t forest, struct t8_data_per
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -5565,29 +5576,40 @@ struct double_3d_array ErrorSinglescale3d(t8_forest_t forest, struct t8_data_per
         double value_dim1 = F1(x,y) - AuswertungSinglescale_3d.dim_val[0];
         double value_dim2 = F2(x,y) - AuswertungSinglescale_3d.dim_val[1];
         double value_dim3 = F3(x,y) - AuswertungSinglescale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-struct double_3d_array ErrorSinglescale3dSpline(t8_forest_t forest, struct t8_data_per_element_3d *element_data,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule) {
+double ErrorSinglescale3dSpline(t8_forest_t forest, struct t8_data_per_element_3d *element_data,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5606,10 +5628,7 @@ struct double_3d_array ErrorSinglescale3dSpline(t8_forest_t forest, struct t8_da
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (forest);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -5646,7 +5665,7 @@ struct double_3d_array ErrorSinglescale3dSpline(t8_forest_t forest, struct t8_da
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -5655,29 +5674,40 @@ struct double_3d_array ErrorSinglescale3dSpline(t8_forest_t forest, struct t8_da
         double value_dim1 = eval_spline(spline_d1,x,y,xacc_d1,yacc_d1) - AuswertungSinglescale_3d.dim_val[0];
         double value_dim2 = eval_spline(spline_d2,x,y,xacc_d2,yacc_d2) - AuswertungSinglescale_3d.dim_val[1];
         double value_dim3 = eval_spline(spline_d3,x,y,xacc_d3,yacc_d3) - AuswertungSinglescale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-double ErrorSinglescaleWaveletfree(t8_forest_t forest, struct t8_data_per_element_waveletfree *element_data,func F, int rule) {
+double ErrorSinglescaleWaveletfree(t8_forest_t forest, struct t8_data_per_element_waveletfree *element_data,func F, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5738,19 +5768,38 @@ double ErrorSinglescaleWaveletfree(t8_forest_t forest, struct t8_data_per_elemen
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = F(x,y) - AuswertungSinglescaleWaveletfree(forest,element_data,x,y,itree,ielement,current_index);
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorSinglescaleWaveletfree3d(t8_forest_t forest, struct t8_data_per_element_waveletfree_3d *element_data,func F1,func F2,func F3, int rule) {
+double ErrorSinglescaleWaveletfree3d(t8_forest_t forest, struct t8_data_per_element_waveletfree_3d *element_data,func F1,func F2,func F3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5769,10 +5818,7 @@ struct double_3d_array ErrorSinglescaleWaveletfree3d(t8_forest_t forest, struct 
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (forest);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -5809,7 +5855,7 @@ struct double_3d_array ErrorSinglescaleWaveletfree3d(t8_forest_t forest, struct 
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -5818,29 +5864,40 @@ struct double_3d_array ErrorSinglescaleWaveletfree3d(t8_forest_t forest, struct 
         double value_dim1 = F1(x,y) - AuswertungSinglescale_3d.dim_val[0];
         double value_dim2 = F2(x,y) - AuswertungSinglescale_3d.dim_val[1];
         double value_dim3 = F3(x,y) - AuswertungSinglescale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-double ErrorSinglescaleWaveletfreeSpline(t8_forest_t forest, struct t8_data_per_element_waveletfree *element_data,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule) {
+double ErrorSinglescaleWaveletfreeSpline(t8_forest_t forest, struct t8_data_per_element_waveletfree *element_data,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5901,19 +5958,38 @@ double ErrorSinglescaleWaveletfreeSpline(t8_forest_t forest, struct t8_data_per_
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = eval_spline(spline,x,y,xacc,yacc) - AuswertungSinglescaleWaveletfree(forest,element_data,x,y,itree,ielement,current_index);
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorSinglescaleWaveletfree3dSpline(t8_forest_t forest, struct t8_data_per_element_waveletfree_3d *element_data,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule) {
+double ErrorSinglescaleWaveletfree3dSpline(t8_forest_t forest, struct t8_data_per_element_waveletfree_3d *element_data,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -5932,10 +6008,7 @@ struct double_3d_array ErrorSinglescaleWaveletfree3dSpline(t8_forest_t forest, s
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (forest);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -5972,7 +6045,7 @@ struct double_3d_array ErrorSinglescaleWaveletfree3dSpline(t8_forest_t forest, s
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -5981,30 +6054,41 @@ struct double_3d_array ErrorSinglescaleWaveletfree3dSpline(t8_forest_t forest, s
         double value_dim1 = eval_spline(spline_d1,x,y,xacc_d1,yacc_d1) - AuswertungSinglescale_3d.dim_val[0];
         double value_dim2 = eval_spline(spline_d2,x,y,xacc_d2,yacc_d2) - AuswertungSinglescale_3d.dim_val[1];
         double value_dim3 = eval_spline(spline_d3,x,y,xacc_d3,yacc_d3) - AuswertungSinglescale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
 
-double ErrorMultiscale(struct grid_hierarchy initial_grid_hierarchy, int max_lev,func F, int rule) {
+double ErrorMultiscale(struct grid_hierarchy initial_grid_hierarchy, int max_lev,func F, int rule,const char* err_type) {
   double sum = 0.0;
   int order_num;
   double *wtab;
@@ -6064,22 +6148,38 @@ double ErrorMultiscale(struct grid_hierarchy initial_grid_hierarchy, int max_lev
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = F(x,y)-AuswertungMultiscale(initial_grid_hierarchy,max_lev,x,y,itree,ielement,current_index);
-
-        //t8_global_productionf ("AuswertungMS: %f\n",AuswertungMultiscale(initial_grid_hierarchy,max_lev,x,y,itree,ielement,current_index));
-        //t8_global_productionf ("AuswertungSS: %f\n",AuswertungSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,x,y,itree,ielement,current_index));
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-double ErrorMultiscaleSpline(struct grid_hierarchy initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule) {
+double ErrorMultiscaleSpline(struct grid_hierarchy initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6140,19 +6240,38 @@ double ErrorMultiscaleSpline(struct grid_hierarchy initial_grid_hierarchy, int m
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = eval_spline(spline,x,y,xacc,yacc) - AuswertungMultiscale(initial_grid_hierarchy,max_level,x,y,itree,ielement,current_index);
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorMultiscale3d(struct grid_hierarchy_3d initial_grid_hierarchy, int max_level,func F1,func F2,func F3, int rule) {
+double ErrorMultiscale3d(struct grid_hierarchy_3d initial_grid_hierarchy, int max_level,func F1,func F2,func F3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6171,10 +6290,7 @@ struct double_3d_array ErrorMultiscale3d(struct grid_hierarchy_3d initial_grid_h
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (initial_grid_hierarchy.lev_arr[max_level].forest_arr);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -6211,7 +6327,7 @@ struct double_3d_array ErrorMultiscale3d(struct grid_hierarchy_3d initial_grid_h
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -6220,29 +6336,40 @@ struct double_3d_array ErrorMultiscale3d(struct grid_hierarchy_3d initial_grid_h
         double value_dim1 = F1(x,y) - Auswertung_Multiscale_3d.dim_val[0];
         double value_dim2 = F2(x,y) - Auswertung_Multiscale_3d.dim_val[1];
         double value_dim3 = F3(x,y) - Auswertung_Multiscale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-struct double_3d_array ErrorMultiscale3dSpline(struct grid_hierarchy_3d initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule) {
+double ErrorMultiscale3dSpline(struct grid_hierarchy_3d initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6261,10 +6388,7 @@ struct double_3d_array ErrorMultiscale3dSpline(struct grid_hierarchy_3d initial_
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (initial_grid_hierarchy.lev_arr[max_level].forest_arr);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -6301,7 +6425,7 @@ struct double_3d_array ErrorMultiscale3dSpline(struct grid_hierarchy_3d initial_
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -6310,29 +6434,40 @@ struct double_3d_array ErrorMultiscale3dSpline(struct grid_hierarchy_3d initial_
         double value_dim1 = eval_spline(spline_d1,x,y,xacc_d1,yacc_d1) - Auswertung_Multiscale_3d.dim_val[0];
         double value_dim2 = eval_spline(spline_d2,x,y,xacc_d2,yacc_d2) - Auswertung_Multiscale_3d.dim_val[1];
         double value_dim3 = eval_spline(spline_d3,x,y,xacc_d3,yacc_d3) - Auswertung_Multiscale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-double ErrorMultiscaleWaveletfree(struct grid_hierarchy_waveletfree initial_grid_hierarchy, int max_level,func F, int rule) {
+double ErrorMultiscaleWaveletfree(struct grid_hierarchy_waveletfree initial_grid_hierarchy, int max_level,func F, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6394,19 +6529,38 @@ double ErrorMultiscaleWaveletfree(struct grid_hierarchy_waveletfree initial_grid
         double y = xytab[1+order*2];
         //t8_global_productionf ("AuswertungMS: %f\n",AuswertungMultiscaleWaveletfree(initial_grid_hierarchy,max_level,x,y,itree,ielement,current_index));
         double value = F(x,y) - AuswertungMultiscaleWaveletfree(initial_grid_hierarchy,max_level,x,y,itree,ielement,current_index);
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorMultiscaleWaveletfree3d(struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy, int max_level,func F1,func F2,func F3, int rule) {
+double ErrorMultiscaleWaveletfree3d(struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy, int max_level,func F1,func F2,func F3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6425,10 +6579,7 @@ struct double_3d_array ErrorMultiscaleWaveletfree3d(struct grid_hierarchy_wavele
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (initial_grid_hierarchy.lev_arr[max_level].forest_arr);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -6465,7 +6616,7 @@ struct double_3d_array ErrorMultiscaleWaveletfree3d(struct grid_hierarchy_wavele
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -6474,29 +6625,40 @@ struct double_3d_array ErrorMultiscaleWaveletfree3d(struct grid_hierarchy_wavele
         double value_dim1 = F1(x,y) - Auswertung_Multiscale_3d.dim_val[0];
         double value_dim2 = F2(x,y) - Auswertung_Multiscale_3d.dim_val[1];
         double value_dim3 = F3(x,y) - Auswertung_Multiscale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
-double ErrorMultiscaleWaveletfreeSpline(struct grid_hierarchy_waveletfree initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule) {
+double ErrorMultiscaleWaveletfreeSpline(struct grid_hierarchy_waveletfree initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline, gsl_interp_accel *xacc, gsl_interp_accel *yacc, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6557,19 +6719,38 @@ double ErrorMultiscaleWaveletfreeSpline(struct grid_hierarchy_waveletfree initia
         double x = xytab[order*2];
         double y = xytab[1+order*2];
         double value = eval_spline(spline,x,y,xacc,yacc) - AuswertungMultiscaleWaveletfree(initial_grid_hierarchy,max_level,x,y,itree,ielement,current_index );
-        quad += wtab[order] * value * value;
+        if (err_type == "L1") {
+            quad += wtab[order] * abs(value);
+        }
+        else if (err_type == "L2") {
+            quad += wtab[order] * value * value;
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad *=volume;
-      sum += quad;
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  return sqrt(sum);
+  return sum;
 }
 
-struct double_3d_array ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule) {
+double ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_waveletfree_3d initial_grid_hierarchy, int max_level,spline eval_spline,const gsl_spline2d *spline_d1, gsl_interp_accel *xacc_d1, gsl_interp_accel *yacc_d1,const gsl_spline2d *spline_d2, gsl_interp_accel *xacc_d2, gsl_interp_accel *yacc_d2,const gsl_spline2d *spline_d3, gsl_interp_accel *xacc_d3, gsl_interp_accel *yacc_d3, int rule,const char* err_type) {
   int order_num;
   double *wtab;
   double *xytab;
@@ -6588,10 +6769,7 @@ struct double_3d_array ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_
   t8_locidx_t ielement, num_elements_in_tree;
   const t8_element_t *element;
   num_local_trees = t8_forest_get_num_local_trees (initial_grid_hierarchy.lev_arr[max_level].forest_arr);
-  struct double_3d_array sum;
-  sum.dim_val[0] = 0.0;
-  sum.dim_val[1] = 0.0;
-  sum.dim_val[2] = 0.0;
+  double sum=0.0;
   for (itree = 0, current_index = 0; itree < num_local_trees; ++itree) {
     /* This loop iterates through all local trees in the forest. */
     /* Get the number of elements of this tree. */
@@ -6628,7 +6806,7 @@ struct double_3d_array ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_
         verts[1][0], verts[1][1],
         verts[2][0], verts[2][1]};
       reference_to_physical_t3 (eckpunkte, order_num, xytab_ref, xytab);
-      double quad[3] = {0.,0.,0.};
+      double quad = 0.0;
       for (int order = 0; order < order_num; ++order) {
         double x = xytab[order*2];
         double y = xytab[1+order*2];
@@ -6637,25 +6815,36 @@ struct double_3d_array ErrorMultiscaleWaveletfree3dSpline(struct grid_hierarchy_
         double value_dim1 = eval_spline(spline_d1,x,y,xacc_d1,yacc_d1) - Auswertung_Multiscale_3d.dim_val[0];
         double value_dim2 = eval_spline(spline_d2,x,y,xacc_d2,yacc_d2) - Auswertung_Multiscale_3d.dim_val[1];
         double value_dim3 = eval_spline(spline_d3,x,y,xacc_d3,yacc_d3) - Auswertung_Multiscale_3d.dim_val[2];
-        quad[0] += wtab[order] * value_dim1 * value_dim1;
-        quad[1] += wtab[order] * value_dim2 * value_dim2;
-        quad[2] += wtab[order] * value_dim3 * value_dim3;
+        if (err_type == "L1") {
+            quad +=wtab[order] * (abs(value_dim1)+abs(value_dim2)+abs(value_dim3));
+        }
+        else if (err_type == "L2") {
+          quad +=wtab[order] * (value_dim1 * value_dim1+value_dim2 * value_dim2+value_dim3 * value_dim3);
+        }
+        else if (err_type == "Linf") {
+            quad = max(abs(value_dim1),quad);
+            quad = max(abs(value_dim2),quad);
+            quad = max(abs(value_dim3),quad);
+        }
+        else {
+            printf("Invalid action: %s\n", err_type);
+        }
       }
-      quad[0] *=volume;
-      quad[1] *=volume;
-      quad[2] *=volume;
-
-      sum.dim_val[0]+= quad[0];
-      sum.dim_val[1]+= quad[1];
-      sum.dim_val[2]+= quad[2];
+      if(err_type == "L1" ||err_type == "L2"){
+        quad *=volume;
+        sum += quad;
+      }
+      else if (err_type == "Linf") {
+          sum = max(abs(quad),sum);
+      }
     }
+  }
+  if(err_type == "L2"){
+    sum=sqrt(sum);
   }
   T8_FREE(wtab);
   T8_FREE(xytab);
   T8_FREE(xytab_ref);
-  sum.dim_val[0]=sqrt(sum.dim_val[0]);
-  sum.dim_val[1]=sqrt(sum.dim_val[1]);
-  sum.dim_val[2]=sqrt(sum.dim_val[2]);
   return sum;
 }
 
@@ -7046,7 +7235,7 @@ t8_output_data_to_vtu_hierarchy (struct grid_hierarchy initial_grid_hierarchy){
  * Optionen: Waveletfree oder classical
  */
 void
-t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev,)
+t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev,const char* err_type)
 {
   t8_forest_t forest=initial_grid_hierarchy.lev_arr[0].forest_arr;
   t8_forest_t forest_adapt;
@@ -7058,10 +7247,10 @@ t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int m
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
 
   MultiScaleOperator(initial_grid_hierarchy);
-  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,"L2");
+  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS:%f \n",error);
   InverseMultiScaleOperator(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,,"L2");
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,,err_type);
   t8_global_productionf ("Error SS danach:%f \n",error);
   /*
   MultiScaleOperator(initial_grid_hierarchy);
@@ -7094,7 +7283,7 @@ t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int m
   //MultiScaleOperator(initial_grid_hierarchy);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   t8_global_productionf ("Vorher \n");
-  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10);
+  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10,err_type);
   t8_global_productionf ("Nachher \n");
   t8_global_productionf ("Error MS:%f \n",error);
   //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
@@ -7178,7 +7367,7 @@ t8_msa (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int m
  * Optionen: Waveletfree oder classical
  */
 void
-t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,double c_tresh,int max_lev)
+t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,double c_tresh,int max_lev,const char* err_type)
 {
   t8_forest_t forest=initial_grid_hierarchy.lev_arr[0].forest_arr;
   t8_forest_t forest_adapt;
@@ -7190,10 +7379,10 @@ t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,doubl
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
 
   MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
-  double error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  double error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS:%f \n",error);
   InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-  error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS danach:%f \n",error);
   /*
   MultiScaleOperator(initial_grid_hierarchy);
@@ -7226,7 +7415,7 @@ t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,doubl
   //MultiScaleOperator(initial_grid_hierarchy);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   t8_global_productionf ("Vorher \n");
-  error = ErrorMultiscaleWaveletfree(initial_grid_hierarchy,max_lev,F,10);
+  error = ErrorMultiscaleWaveletfree(initial_grid_hierarchy,max_lev,F,10,err_type);
   t8_global_productionf ("Nachher \n");
   t8_global_productionf ("Error MS:%f \n",error);
   //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
@@ -7235,7 +7424,7 @@ t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,doubl
   //ThresholdOperatorwaveletfree(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   HierarchischerThresholdOperatorwaveletfree(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-  error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
+  error = ErrorSinglescaleWaveletfree(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10,err_type);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //ThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //GridAdaptation(initial_grid_hierarchy, c_tresh, 2.0);
@@ -7310,7 +7499,7 @@ t8_msa_wf (func F,struct grid_hierarchy_waveletfree initial_grid_hierarchy,doubl
  * Optionen: Waveletfree oder classical
  */
 void
-t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev)
+t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev,const char* err_type)
 {
   t8_forest_t forest=initial_grid_hierarchy.lev_arr[0].forest_arr;
   t8_forest_t forest_adapt;
@@ -7322,10 +7511,10 @@ t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,in
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
 
   MultiScaleOperator(initial_grid_hierarchy);
-  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS:%f \n",error);
   InverseMultiScaleOperator(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS danach:%f \n",error);
   /*
   MultiScaleOperator(initial_grid_hierarchy);
@@ -7358,7 +7547,7 @@ t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,in
   //MultiScaleOperator(initial_grid_hierarchy);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   t8_global_productionf ("Vorher \n");
-  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10);
+  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10,err_type);
   t8_global_productionf ("Nachher \n");
   t8_global_productionf ("Error MS:%f \n",error);
   //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
@@ -7367,7 +7556,7 @@ t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,in
   //ThresholdOperatorwaveletfree(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10,err_type);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //ThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //GridAdaptation(initial_grid_hierarchy, c_tresh, 2.0);
@@ -7442,7 +7631,7 @@ t8_msa_3d (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,in
  * Optionen: Waveletfree oder classical
  */
 void
-t8_msa_3d_wf (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev)
+t8_msa_3d_wf (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh,int max_lev,const char* err_type)
 {
   t8_forest_t forest=initial_grid_hierarchy.lev_arr[0].forest_arr;
   t8_forest_t forest_adapt;
@@ -7454,10 +7643,10 @@ t8_msa_3d_wf (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
 
   MultiScaleOperator(initial_grid_hierarchy);
-  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  double error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS:%f \n",error);
   InverseMultiScaleOperator(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_lev].forest_arr,initial_grid_hierarchy.lev_arr[max_lev].data_arr,F,10,err_type);
   t8_global_productionf ("Error SS danach:%f \n",error);
   /*
   MultiScaleOperator(initial_grid_hierarchy);
@@ -7490,7 +7679,7 @@ t8_msa_3d_wf (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh
   //MultiScaleOperator(initial_grid_hierarchy);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   t8_global_productionf ("Vorher \n");
-  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10);
+  error = ErrorMultiscale(initial_grid_hierarchy,max_lev,F,10,err_type);
   t8_global_productionf ("Nachher \n");
   t8_global_productionf ("Error MS:%f \n",error);
   //MultiScaleOperatorWaveletFree(initial_grid_hierarchy);
@@ -7499,7 +7688,7 @@ t8_msa_3d_wf (func F,struct grid_hierarchy initial_grid_hierarchy,double c_tresh
   //ThresholdOperatorwaveletfree(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //InverseMultiScaleOperatorwaveletfree(initial_grid_hierarchy);
-  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10);
+  error = ErrorSinglescale(initial_grid_hierarchy.lev_arr[max_level].forest_arr,initial_grid_hierarchy.lev_arr[max_level].data_arr,F,10,err_type);
   //HierarchischerThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //ThresholdOperator(initial_grid_hierarchy,c_tresh, 2.0,anzahl_gesamt,anzahl_klein);
   //GridAdaptation(initial_grid_hierarchy, c_tresh, 2.0);
