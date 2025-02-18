@@ -22,59 +22,33 @@
 
 #include <t8_geometry/t8_geometry_implementations/t8_geometry_zero.hxx>
 
-t8_geometry_zero::t8_geometry_zero (int dim)
+t8_geometry_zero::t8_geometry_zero (): t8_geometry ("t8_geom_zero")
 {
-  T8_ASSERT (0 <= dim && dim <= 3);
-  size_t num_chars = 100;
-  char *name_tmp = T8_ALLOC (char, num_chars);
-
-  snprintf (name_tmp, num_chars, "t8_geom_zero_%i", dim);
-  name = name_tmp;
-  dimension = dim;
 }
 
 t8_geometry_zero::~t8_geometry_zero ()
 {
-  T8_FREE ((char *) name);
 }
 
-/**
- * Map a point in the reference space \f$ [0,1]^\mathrm{dim} \to \mathbb{R}^3 \f$.
- * \param [in]  cmesh      The cmesh in which the point lies.
- * \param [in]  gtreeid    The global tree (of the cmesh) in which the reference point is.
- * \param [in]  ref_coords  Array of \a dimension many entries, specifying a point in \f$ [0,1]^\mathrm{dim} \f$.
- * \param [out] out_coords  The mapped coordinates in physical space of \a ref_coords.
- */
-/* *INDENT-OFF* */
-/* Indent has trouble with the const keyword at the end */
 void
 t8_geometry_zero::t8_geom_evaluate (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const double *ref_coords,
-                                    double out_coords[3]) const
-/* *INDENT-ON* */
+                                    const size_t num_coords, double *out_coords) const
 {
   /* Set the out_coords to 0 */
-  out_coords[0] = 0;
-  out_coords[1] = 0;
-  out_coords[2] = 0;
+  for (size_t coord = 0; coord < num_coords; coord++) {
+    out_coords[0 + num_coords * T8_ECLASS_MAX_DIM] = 0;
+    out_coords[1 + num_coords * T8_ECLASS_MAX_DIM] = 0;
+    out_coords[2 + num_coords * T8_ECLASS_MAX_DIM] = 0;
+  }
 }
 
-/**
- * Compute the jacobian of the \a t8_geom_evaluate map at a point in the reference space \f$ [0,1]^\mathrm{dim} \f$.
- * \param [in]  cmesh      The cmesh in which the point lies.
- * \param [in]  gtreeid    The global tree (of the cmesh) in which the reference point is.
- * \param [in]  ref_coords  Array of \a dimension many entries, specifying a point in \f$ [0,1]^\mathrm{dim} \f$.
- * \param [out] jacobian    The jacobian at \a ref_coords. Array of size dimension x 3. Indices 3*i, 3*i+1, 3*i+2
- *                          correspond to the i-th column of the jacobian (Entry 3*i + j is \f$ \frac{\partial f_j}{\partial x_i} \f$).
- */
-/* *INDENT-OFF* */
-/* Indent has trouble with the const keyword at the end */
 void
 t8_geometry_zero::t8_geom_evaluate_jacobian (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const double *ref_coords,
-                                             double *jacobian) const
-/* *INDENT-ON* */
+                                             const size_t num_coords, double *jacobian) const
 {
   /* Set the jacobian to 0 */
-  memset (jacobian, 0, sizeof (double) * 3 * dimension);
+  const int tree_dim = t8_eclass_to_dimension[active_tree_class];
+  memset (jacobian, 0, sizeof (double) * 3 * tree_dim * num_coords);
 }
 
 inline void
@@ -82,3 +56,26 @@ t8_geometry_zero::t8_geom_load_tree_data (t8_cmesh_t cmesh, t8_gloidx_t gtreeid)
 {
   /* Do nothing. */
 }
+
+T8_EXTERN_C_BEGIN ();
+
+/* Satisfy the C interface from t8_geometry_zero.h.
+ * Create a new geometry. */
+t8_geometry_c *
+t8_geometry_zero_new ()
+{
+  t8_geometry_zero *geom = new t8_geometry_zero ();
+  return (t8_geometry_c *) geom;
+}
+
+void
+t8_geometry_zero_destroy (t8_geometry_c **geom)
+{
+  T8_ASSERT (geom != NULL);
+  T8_ASSERT ((*geom)->t8_geom_get_type () == T8_GEOMETRY_TYPE_ZERO);
+
+  delete *geom;
+  *geom = NULL;
+}
+
+T8_EXTERN_C_END ();

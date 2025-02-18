@@ -55,11 +55,11 @@ These functions write a file in the NetCDF-format which represents the given 2D-
 #define NC_COLLECTIVE 1
 #endif
 #endif
-#include <t8_element_cxx.hxx>
 #include <t8_forest/t8_forest_general.h>
 #include <t8_forest/t8_forest_geometrical.h>
 #include <t8_forest_netcdf.h>
 #include <t8_element_shape.h>
+#include <t8_schemes/t8_scheme.hxx>
 
 T8_EXTERN_C_BEGIN ();
 
@@ -379,7 +379,6 @@ t8_forest_write_netcdf_data (t8_forest_t forest, t8_forest_netcdf_context_t *con
   t8_locidx_t local_elem_id;
   t8_locidx_t num_local_tree_elem;
   t8_element_shape_t element_shape;
-  t8_element_t *element;
   t8_locidx_t local_tree_offset;
   t8_gloidx_t first_local_elem_id;
   t8_gloidx_t num_local_nodes;
@@ -389,6 +388,7 @@ t8_forest_write_netcdf_data (t8_forest_t forest, t8_forest_netcdf_context_t *con
   size_t start_ptr;
   size_t count_ptr;
   int retval;
+  const t8_scheme *scheme = t8_forest_get_scheme (forest);
 
   /* Get the first local element id in a forest (function is collective) */
   first_local_elem_id = t8_forest_get_first_local_element_id (forest);
@@ -416,12 +416,10 @@ t8_forest_write_netcdf_data (t8_forest_t forest, t8_forest_netcdf_context_t *con
     local_tree_offset = t8_forest_get_tree_element_offset (forest, ltree_id);
     /* Iterate over all local elements in the local tree */
     for (local_elem_id = 0; local_elem_id < num_local_tree_elem; local_elem_id++) {
-      /* Get the eclass scheme */
-      t8_eclass_scheme_c *scheme = t8_forest_get_eclass_scheme (forest, tree_class);
       /* Get the local element in the local tree */
-      element = t8_forest_get_element_in_tree (forest, ltree_id, local_elem_id);
+      const t8_element_t *element = t8_forest_get_element_in_tree (forest, ltree_id, local_elem_id);
       /* Determine the element shape */
-      element_shape = scheme->t8_element_shape (element);
+      element_shape = scheme->element_get_shape (tree_class, element);
       /* Store the type of the element in its global index position */
       Mesh_elem_types[(local_tree_offset + local_elem_id)] = t8_element_shape_vtk_type (element_shape);
       /* Store the elements tree_id in its global index position */
@@ -667,7 +665,7 @@ static void
 t8_forest_write_netcdf_coordinate_data (t8_forest_t forest, t8_forest_netcdf_context_t *context, sc_MPI_Comm comm)
 {
 #if T8_WITH_NETCDF
-  double *vertex_coords = T8_ALLOC (double, 3);
+  double vertex_coords[3];
   t8_eclass_t tree_class;
   t8_locidx_t num_local_trees;
   t8_locidx_t ltree_id = 0;
@@ -675,7 +673,6 @@ t8_forest_write_netcdf_coordinate_data (t8_forest_t forest, t8_forest_netcdf_con
   t8_locidx_t num_local_tree_elem;
   t8_locidx_t local_elem_id;
   t8_locidx_t local_tree_offset;
-  t8_element_t *element;
   t8_element_shape_t element_shape;
   t8_gloidx_t first_local_elem_id;
   size_t num_elements;
@@ -732,7 +729,7 @@ t8_forest_write_netcdf_coordinate_data (t8_forest_t forest, t8_forest_netcdf_con
 
   /* Check if pointers are not NULL. */
   T8_ASSERT (Mesh_node_x != NULL && Mesh_node_y != NULL && Mesh_node_z != NULL && Mesh_elem_nodes != NULL);
-
+  const t8_scheme *scheme = t8_forest_get_scheme (forest);
   /* Iterate over all local trees. */
   /* Corners should be stored in the same order as in a vtk-file (read that somewehere on a netcdf page). */
   for (ltree_id = 0; ltree_id < num_local_trees; ltree_id++) {
@@ -742,12 +739,10 @@ t8_forest_write_netcdf_coordinate_data (t8_forest_t forest, t8_forest_netcdf_con
     local_tree_offset = t8_forest_get_tree_element_offset (forest, ltree_id);
 
     for (local_elem_id = 0; local_elem_id < num_local_tree_elem; local_elem_id++) {
-      /* Get the eclass scheme */
-      t8_eclass_scheme_c *scheme = t8_forest_get_eclass_scheme (forest, tree_class);
       /* Get the local element in the local tree */
-      element = t8_forest_get_element_in_tree (forest, ltree_id, local_elem_id);
+      const t8_element_t *element = t8_forest_get_element_in_tree (forest, ltree_id, local_elem_id);
       /* Determine the element shape */
-      element_shape = scheme->t8_element_shape (element);
+      element_shape = scheme->element_get_shape (tree_class, element);
       /* Get the number of nodes for this elements shape */
       number_nodes = t8_element_shape_num_vertices (element_shape);
       i = 0;
@@ -770,8 +765,6 @@ t8_forest_write_netcdf_coordinate_data (t8_forest_t forest, t8_forest_netcdf_con
       }
     }
   }
-  /* Free allocated memory */
-  T8_FREE (vertex_coords);
 
   /* *Write the data into the NetCDF coordinate variables.* */
 
@@ -825,7 +818,6 @@ t8_forest_write_user_netcdf_data (t8_forest_t forest, t8_forest_netcdf_context_t
     /* Counters which imply the position in the NetCDF-variable where the data will be written, */
     start_ptr = (size_t) t8_forest_get_first_local_element_id (forest);
     count_ptr = (size_t) t8_forest_get_local_num_elements (forest);
-    ;
 
     /* Iterate over the amount of user-defined variables */
     for (i = 0; i < num_extern_netcdf_vars; i++) {

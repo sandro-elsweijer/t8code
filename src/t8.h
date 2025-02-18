@@ -30,7 +30,9 @@
 #define T8_H
 
 /* include config headers */
+#ifndef T8_CMAKE_BUILD
 #include <t8_config.h>
+#endif
 #include <sc_config.h>
 #if (defined(T8_ENABLE_MPI) && !defined(SC_ENABLE_MPI)) || (!defined(T8_ENABLE_MPI) && defined(SC_ENABLE_MPI))
 #error "MPI configured differently in t8code and libsc"
@@ -69,6 +71,13 @@ T8_EXTERN_C_BEGIN ();
 #define T8_ASSERT(c) SC_CHECK_ABORT ((c), "Assertion '" #c "'")
 #else
 #define T8_ASSERT(c) SC_NOOP ()
+#endif
+
+/**Extended T8_ASSERT assertion with custom error message. Only active in debug-mode. */
+#ifdef T8_ENABLE_DEBUG
+#define T8_ASSERTF(c, msg) SC_CHECK_ABORT ((c), "Assertion '" #c "': " msg)
+#else
+#define T8_ASSERTF(c, msg) SC_NOOP ()
 #endif
 
 /** Allocate a \a t-array with \a n elements. */
@@ -115,6 +124,7 @@ typedef uint64_t t8_linearidx_t;
 
 /** Define precisions for computations */
 #define T8_PRECISION_EPS SC_EPS
+#define T8_PRECISION_SQRT_EPS sqrt (T8_PRECISION_EPS)
 
 /** Access multidimensional data on one-dimensional C arrays. */
 #define T8_1D_TO_1D(nx, i) (i)
@@ -129,6 +139,7 @@ typedef enum {
   T8_MPI_PARTITION_FOREST,              /**< Used for forest partitioning */
   T8_MPI_GHOST_FOREST,                  /**< Used for for ghost layer creation */
   T8_MPI_GHOST_EXC_FOREST,              /**< Used for ghost data exchange */
+  T8_MPI_TEST_ELEMENT_PACK_TAG,         /**< Used for testing mpi pack and unpack functionality */
   T8_MPI_TAG_LAST
 } t8_MPI_tag_t;
 
@@ -139,7 +150,7 @@ typedef enum {
 int
 t8_get_package_id (void);
 
-/** Logging function parametrized by local/global category and priority.
+/** Logging function parameterized by local/global category and priority.
  * \param [in] category     Either SC_LC_NORMAL for outputting on every rank
  *                          or SC_LC_GLOBAL for outputting on the root rank.
  * \param [in] priority     Please see sc.h for legal log priorities.
@@ -149,7 +160,7 @@ t8_get_package_id (void);
 void
 t8_logv (int category, int priority, const char *fmt, va_list ap);
 
-/** Logging function parametrized by local/global category and priority.
+/** Logging function parameterized by local/global category and priority.
  * \param [in] category     Either SC_LC_NORMAL for outputting on every rank
  *                          or SC_LC_GLOBAL for outputting on the root rank.
  * \param [in] priority     Please see sc.h for legal log priorities.
@@ -264,7 +275,7 @@ t8_init (int log_threshold);
  * \return           A void * pointing to entry \a it in \a array.
  */
 void *
-t8_sc_array_index_locidx (sc_array_t *array, t8_locidx_t it);
+t8_sc_array_index_locidx (const sc_array_t *array, const t8_locidx_t it);
 
 /* call this at the end of a header file to match T8_EXTERN_C_BEGIN (). */
 T8_EXTERN_C_END ();

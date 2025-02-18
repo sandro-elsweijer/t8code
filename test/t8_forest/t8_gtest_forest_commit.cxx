@@ -24,12 +24,14 @@
 #include <t8_eclass.h>
 #include <t8_cmesh.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default.hxx>
 #include <t8_forest/t8_forest_partition.h>
 #include <t8_forest/t8_forest_private.h>
-#include "t8_cmesh/t8_cmesh_testcases.h"
+#include "test/t8_cmesh_generator/t8_cmesh_example_sets.hxx"
+#include <test/t8_gtest_macros.hxx>
+#include <test/t8_gtest_schemes.hxx>
 
-/* In this test, we adapt, balance and partition a uniform forest.
+/* In this test we adapt, balance and partition a uniform forest.
  * We do this in two ways:
  * 1st  All operations are performed in one single call to t8_forest_commit
  * 2nd  Each intermediate step is performed in a separate commit
@@ -37,35 +39,41 @@
  * After these two forests are created, we check for equality.
  */
 
-class forest_commit: public testing::TestWithParam<int> {
+class forest_commit: public testing::TestWithParam<std::tuple<int, cmesh_example_base *>> {
  protected:
   void
   SetUp () override
   {
-    cmesh_id = GetParam ();
-
+    const int scheme_id = std::get<0> (GetParam ());
+    scheme = create_from_scheme_id (scheme_id);
     /* Construct a cmesh */
-    cmesh = t8_test_create_cmesh (cmesh_id);
+    cmesh = std::get<1> (GetParam ())->cmesh_create ();
+    if (t8_cmesh_is_empty (cmesh)) {
+      /* forest_commit does not support empty cmeshes*/
+      scheme->unref ();
+      GTEST_SKIP ();
+    }
   }
   void
   TearDown () override
   {
     t8_cmesh_destroy (&cmesh);
   }
-  int cmesh_id;
   t8_cmesh_t cmesh;
+  const t8_scheme *scheme;
 };
 
 /* Adapt a forest such that always the first child of a
  * tree is refined and no other elements. This results in a highly
  * imbalanced forest. */
 static int
-t8_test_adapt_balance (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-                       t8_eclass_scheme_c *ts, const int is_family, const int num_elements, t8_element_t *elements[])
+t8_test_adapt_balance (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_eclass_t tree_class,
+                       t8_locidx_t lelement_id, const t8_scheme *scheme, const int is_family, const int num_elements,
+                       t8_element_t *elements[])
 {
-  T8_ASSERT (!is_family || (is_family && num_elements == ts->t8_element_num_children (elements[0])));
+  T8_ASSERT (!is_family || (is_family && num_elements == scheme->element_get_num_children (tree_class, elements[0])));
 
-  int level = ts->t8_element_level (elements[0]);
+  const int level = scheme->element_get_level (tree_class, elements[0]);
 
   /* we set a maximum refinement level as forest user data */
   int maxlevel = *(int *) t8_forest_get_user_data (forest);
@@ -73,7 +81,7 @@ t8_test_adapt_balance (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t 
     /* Do not refine after the maxlevel */
     return 0;
   }
-  int child_id = ts->t8_element_child_id (elements[0]);
+  const int child_id = scheme->element_get_child_id (tree_class, elements[0]);
   if (child_id == 1) {
     return 1;
   }
@@ -133,15 +141,7 @@ TEST_P (forest_commit, test_forest_commit)
   t8_forest_t forest_ada_bal_part;
   t8_forest_t forest_abp_3part;
 
-#ifdef T8_ENABLE_DEBUG
-  int level_step = 2;
-#else
-  int level_step = 3;
-#endif
-
-  t8_debugf ("Testing forest commit with cmesh_id = %i\n", cmesh_id);
-
-  t8_scheme_cxx_t *scheme = t8_scheme_new_default_cxx ();
+  const int level_step = 2;
 
   /* Compute the first level, such that no process is empty */
   int min_level = t8_forest_min_nonempty_level (cmesh, scheme);
@@ -162,12 +162,13 @@ TEST_P (forest_commit, test_forest_commit)
     forest_abp_3part = t8_test_forest_commit_abp_3step (forest, maxlevel);
 
     ASSERT_TRUE (t8_forest_is_equal (forest_abp_3part, forest_ada_bal_part)) << "The forests are not equal";
-    t8_scheme_cxx_ref (scheme);
+    scheme->ref ();
     t8_forest_unref (&forest_ada_bal_part);
     t8_forest_unref (&forest_abp_3part);
   }
-  t8_scheme_cxx_unref (&scheme);
+  scheme->unref ();
   t8_debugf ("Done testing forest commit.");
 }
 
-INSTANTIATE_TEST_SUITE_P (t8_gtest_forest_commit, forest_commit, testing::Range (0, t8_get_number_of_all_testcases ()));
+INSTANTIATE_TEST_SUITE_P (t8_gtest_forest_commit, forest_commit,
+                          testing::Combine (AllSchemeCollections, AllCmeshsParam), pretty_print_base_example_scheme);

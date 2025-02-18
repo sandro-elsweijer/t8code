@@ -22,12 +22,14 @@
 
 #include <gtest/gtest.h>
 #include <t8_eclass.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default.hxx>
 #include <t8_forest/t8_forest_general.h>
 #include <t8_forest/t8_forest_ghost.h>
 #include <t8_forest/t8_forest_private.h>
 #include <t8_cmesh.h>
-#include "t8_cmesh/t8_cmesh_testcases.h"
+#include "test/t8_cmesh_generator/t8_cmesh_example_sets.hxx"
+#include <test/t8_gtest_macros.hxx>
+#include <test/t8_gtest_schemes.hxx>
 
 /* This test program tests the forest ghost layer.
  * We adapt a forest and create its ghost layer. Afterwards, we
@@ -35,36 +37,39 @@
  * element is in face the owner that is stored in the ghost layer.
   */
 
-class forest_ghost_owner: public testing::TestWithParam<int> {
+class forest_ghost_owner: public testing::TestWithParam<std::tuple<int, cmesh_example_base *>> {
  protected:
   void
   SetUp () override
   {
-    cmesh_id = GetParam ();
-
-    scheme = t8_scheme_new_default_cxx ();
+    const int scheme_id = std::get<0> (GetParam ());
+    scheme = create_from_scheme_id (scheme_id);
     /* Construct a cmesh */
-    cmesh = t8_test_create_cmesh (cmesh_id);
+    cmesh = std::get<1> (GetParam ())->cmesh_create ();
+    if (t8_cmesh_is_empty (cmesh)) {
+      /* empty cmeshes are currently not supported */
+      GTEST_SKIP ();
+    }
   }
   void
   TearDown () override
   {
     t8_cmesh_destroy (&cmesh);
-    t8_scheme_cxx_unref (&scheme);
+    scheme->unref ();
   }
-  int cmesh_id;
   t8_cmesh_t cmesh;
-  t8_scheme_cxx_t *scheme;
+  const t8_scheme *scheme;
 };
 
 static int
-t8_test_gao_adapt (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-                   t8_eclass_scheme_c *ts, const int is_family, const int num_elements, t8_element_t *elements[])
+t8_test_gao_adapt (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_eclass_t tree_class,
+                   t8_locidx_t lelement_id, const t8_scheme *scheme, const int is_family, const int num_elements,
+                   t8_element_t *elements[])
 {
   /* refine every second element up to the maximum level */
-  int level = ts->t8_element_level (elements[0]);
-  t8_linearidx_t eid = ts->t8_element_get_linear_id (elements[0], level);
-  int maxlevel = *(int *) t8_forest_get_user_data (forest);
+  const int level = scheme->element_get_level (tree_class, elements[0]);
+  const t8_linearidx_t eid = scheme->element_get_linear_id (tree_class, elements[0], level);
+  const int maxlevel = *(int *) t8_forest_get_user_data (forest);
 
   if (eid % 2 && level < maxlevel) {
     return 1;
@@ -125,7 +130,7 @@ TEST_P (forest_ghost_owner, test_ghost_owner)
   t8_debugf ("Testing ghost exchange with start level %i\n", min_level);
   for (int level = min_level; level < min_level + 3; level++) {
     /* ref the scheme since we reuse it */
-    t8_scheme_cxx_ref (scheme);
+    scheme->ref ();
     /* ref the cmesh since we reuse it */
     t8_cmesh_ref (cmesh);
     /* Create a uniformly refined forest */
@@ -142,4 +147,4 @@ TEST_P (forest_ghost_owner, test_ghost_owner)
 }
 
 INSTANTIATE_TEST_SUITE_P (t8_gtest_ghost_and_owner, forest_ghost_owner,
-                          testing::Range (0, t8_get_number_of_all_testcases ()));
+                          testing::Combine (AllSchemeCollections, AllCmeshsParam), pretty_print_base_example_scheme);

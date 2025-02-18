@@ -150,8 +150,8 @@ t8_init (int log_threshold)
 
   w = 24;
   t8_global_essentialf ("This is %s\n", t8_get_package_string ());
-  t8_global_productionf ("%-*s %s\n", w, "CPP", T8_CPP);
-  t8_global_productionf ("%-*s %s\n", w, "CPPFLAGS", T8_CPPFLAGS);
+  t8_global_productionf ("%-*s %s\n", w, "CXX", T8_CXX);
+  t8_global_productionf ("%-*s %s\n", w, "CXXFLAGS", T8_CXXFLAGS);
   t8_global_productionf ("%-*s %s\n", w, "CC", T8_CC);
   t8_global_productionf ("%-*s %s\n", w, "CFLAGS", T8_CFLAGS);
   t8_global_productionf ("%-*s %s\n", w, "LDFLAGS", T8_LDFLAGS);
@@ -159,7 +159,7 @@ t8_init (int log_threshold)
 }
 
 void *
-t8_sc_array_index_locidx (sc_array_t *array, t8_locidx_t it)
+t8_sc_array_index_locidx (const sc_array_t *array, const t8_locidx_t it)
 {
   T8_ASSERT (it >= 0 && (size_t) it < array->elem_count);
 

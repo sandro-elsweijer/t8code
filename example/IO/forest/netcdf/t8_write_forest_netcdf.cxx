@@ -42,7 +42,7 @@
 #include <t8_forest/t8_forest_general.h>
 #include <t8_forest/t8_forest_geometrical.h>
 #include <t8_forest/t8_forest_iterate.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default.hxx>
 #include <t8_forest_netcdf.h>
 #include <t8_netcdf.h>
 
@@ -65,14 +65,14 @@ struct t8_example_netcdf_adapt_data
   double coarsen_if_outside_radius; /* coarsen all element families outside of this radius from the sphere's midpoint */
 };
 
-/** This functions describe an adapt_function, an adapt_function describes tge refinement/coarsening rules for a forest
+/** This functions describe an adapt_function, an adapt_function describes the refinement/coarsening rules for a forest
 * \note If an element is inside a given radius from the midpoint of the hypercube, this element is refined. If a family of elements is outiside a given radius from the midpoint of the hypercube, it is coarsened. 
 * \note A detailed description of the adaption process is found in step 3 of the tutorial located in 't8code/example/tutorials'.
 */
 int
 t8_example_netcdf_adapt_fn (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree,
-                            t8_locidx_t lelement_id, t8_eclass_scheme_c *ts, const int is_family,
-                            const int num_elements, t8_element_t *elements[])
+                            const t8_eclass_t tree_class, t8_locidx_t lelement_id, const t8_scheme *scheme,
+                            const int is_family, const int num_elements, t8_element_t *elements[])
 {
   double element_centroid[3];
   double distance;
@@ -177,7 +177,7 @@ t8_example_compare_performance_netcdf_var_properties (sc_MPI_Comm comm, int fore
 {
   t8_cmesh_t cmesh;
   t8_forest_t forest;
-  t8_scheme_cxx_t *default_scheme;
+  const t8_scheme *default_scheme = t8_scheme_new_default ();
   t8_gloidx_t num_elements;
   t8_nc_int64_t *var_rank;
   double *random_values;
@@ -194,8 +194,6 @@ t8_example_compare_performance_netcdf_var_properties (sc_MPI_Comm comm, int fore
   /* Receive the process-local MPI rank */
   retval = sc_MPI_Comm_rank (comm, &mpirank);
   SC_CHECK_MPI (retval);
-  /* Create a default scheme */
-  default_scheme = t8_scheme_new_default_cxx ();
 
   /* Construct a 3D hybrid hypercube as a cmesh */
   cmesh = t8_cmesh_new_hypercube_hybrid (comm, 1, 0);
@@ -208,7 +206,7 @@ t8_example_compare_performance_netcdf_var_properties (sc_MPI_Comm comm, int fore
     forest = t8_example_netcdf_adapt (forest);
   }
   num_elements = t8_forest_get_local_num_elements (forest);
-  t8_productionf ("Number of process-local elements: %ld\n", num_elements);
+  t8_productionf ("Number of process-local elements: %ld\n", static_cast<long> (num_elements));
 
   /* If additional data should be written to the netCDF file, the two variables are created in the following section */
   if (with_additional_data) {
@@ -249,7 +247,7 @@ t8_example_compare_performance_netcdf_var_properties (sc_MPI_Comm comm, int fore
   }
 
   t8_global_productionf ("The uniformly refined forest (refinement level = %d) has %ld global elements.\n",
-                         forest_refinement_level, t8_forest_get_global_num_elements (forest));
+                         forest_refinement_level, static_cast<long> (t8_forest_get_global_num_elements (forest)));
 
   t8_global_productionf (
     "The different netCDF variable storage patterns and mpi variable access patterns are getting tested/timed...\n");
@@ -324,7 +322,7 @@ t8_example_netcdf_write_forest (sc_MPI_Comm comm, int forest_refinement_level, i
 {
   t8_cmesh_t cmesh;
   t8_forest_t forest;
-  t8_scheme_cxx_t *default_scheme;
+  const t8_scheme *default_scheme = t8_scheme_new_default ();
   t8_gloidx_t num_elements;
   t8_nc_int32_t *var_rank;
   double *random_values;
@@ -341,9 +339,6 @@ t8_example_netcdf_write_forest (sc_MPI_Comm comm, int forest_refinement_level, i
   /* Receive the process local MPI rank */
   retval = sc_MPI_Comm_rank (comm, &mpirank);
   SC_CHECK_MPI (retval);
-
-  /* Create a default scheme */
-  default_scheme = t8_scheme_new_default_cxx ();
 
   /* Construct a cube coarse mesh */
   /* Construct a 3D hybrid hypercube as a cmesh */
@@ -368,7 +363,7 @@ t8_example_netcdf_write_forest (sc_MPI_Comm comm, int forest_refinement_level, i
 
   /* Print out the number of local elements of each process */
   num_elements = t8_forest_get_local_num_elements (forest);
-  t8_debugf ("[t8] Rank %d has %ld elements\n", mpirank, num_elements);
+  t8_debugf ("[t8] Rank %d has %ld elements\n", mpirank, static_cast<long> (num_elements));
 
   /* *Example user-defined NetCDF variable* */
   /* Currently, integer (32bit, 64bit) and double NetCDF variables are possible */

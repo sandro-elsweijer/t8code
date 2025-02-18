@@ -1,10 +1,9 @@
 /*
   This file is part of t8code.
   t8code is a C library to manage a collection (a forest) of multiple
-  connected adaptive space-trees of general element types in parallel.
+  connected adaptive space-trees of general element classes in parallel.
 
-  Copyright (C) 2010 The University of Texas System
-  Written by Carsten Burstedde, Lucas C. Wilcox, and Tobin Isaac
+  Copyright (C) 2024 the developers
 
   t8code is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,14 +26,14 @@
 /* The following three tests check whether t8code computes the correct
  * version.
  * The current version of t8code is
- *    1.5.0
+ *    4.0.0-RC1
  * If you increase the major or minor version number, you need to adjust these tests and
  * this comment. */
 
 TEST (t8_gtest_version, major_version)
 {
   /* Change this number when you increase the major version. */
-  const int major_version = 1;
+  const int major_version = 4;
 
   EXPECT_EQ (t8_get_version_major (), major_version);
 }
@@ -42,7 +41,7 @@ TEST (t8_gtest_version, major_version)
 TEST (t8_gtest_version, minor_version)
 {
   /* Change this number when you increase the minor version. */
-  const int minor_version = 5;
+  const int minor_version = 0;
 
   EXPECT_EQ (t8_get_version_minor (), minor_version);
 }
@@ -94,8 +93,6 @@ TEST (t8_gtest_version, check_version_number_has_major_minor_patch)
   const char *major_string = strtok (version_number_copy, ".");
   const char *minor_string = strtok (NULL, ".");
   char *patch_string = strtok (NULL, ".");
-  ;
-
   /* They should not be nullptr.
    * If they are, version_number does not contain two '.' */
   ASSERT_STRNE (major_string, nullptr);

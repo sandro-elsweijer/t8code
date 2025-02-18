@@ -23,14 +23,13 @@
 #include <sc_options.h>
 #include <sc_refcount.h>
 #include <t8_eclass.h>
-#include <t8_element_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default.hxx>
 #include <t8_forest/t8_forest_general.h>
 #include <t8_forest/t8_forest_io.h>
 #include <t8_forest/t8_forest_profiling.h>
 #include <t8_cmesh.h>
 #include <t8_cmesh_readmshfile.h>
-#include <t8_cmesh_vtk_writer.h>
+#include <t8_vtk/t8_vtk_writer.h>
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <example/common/t8_example_common.h>
 
@@ -44,26 +43,26 @@ typedef enum {
  * This function comes from the timings2.c example of p4est.
  */
 int
-t8_refine_p8est (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-                 t8_eclass_scheme_c *ts, const int is_family, const int num_elements, t8_element_t *elements[])
+t8_refine_p8est (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, const t8_eclass_t tree_class,
+                 t8_locidx_t lelement_id, const t8_scheme *scheme, const int is_family, const int num_elements,
+                 t8_element_t *elements[])
 {
-  int id;
-  T8_ASSERT (!is_family || num_elements == ts->t8_element_num_children (elements[0]));
 
-  id = ts->t8_element_child_id (elements[0]);
+  T8_ASSERT (!is_family || num_elements == scheme->element_get_num_children (tree_class, elements[0]));
+
+  const int id = scheme->element_get_child_id (tree_class, elements[0]);
   return (id == 0 || id == 3 || id == 5 || id == 6);
 }
 
 /* Refine every third element. */
-/* TODO: rename */
 static int
-t8_basic_adapt (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree, t8_locidx_t lelement_id,
-                t8_eclass_scheme_c *ts, const int is_family, const int num_elements, t8_element_t *elements[])
+t8_adapt_every_third_element (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t which_tree,
+                              const t8_eclass_t tree_class, t8_locidx_t lelement_id, const t8_scheme *scheme,
+                              const int is_family, const int num_elements, t8_element_t *elements[])
 {
-  int level;
-  T8_ASSERT (!is_family || num_elements == ts->t8_element_num_children (elements[0]));
-  level = ts->t8_element_level (elements[0]);
-  if (ts->t8_element_get_linear_id (elements[0], level) % 3 == 0) {
+  T8_ASSERT (!is_family || num_elements == scheme->element_get_num_children (tree_class, elements[0]));
+  const int level = scheme->element_get_level (tree_class, elements[0]);
+  if (scheme->element_get_linear_id (tree_class, elements[0], level) % 3 == 0) {
     return 1;
   }
   return 0;
@@ -119,13 +118,13 @@ t8_test_ghost_refine_and_partition (t8_cmesh_t cmesh, const int level, sc_MPI_Co
   t8_forest_adapt_t adapt_fn;
 
   if (!no_vtk) {
-    t8_cmesh_vtk_write_file (cmesh, "test_ghost_cmesh0", 1.0);
+    t8_cmesh_vtk_write_file (cmesh, "test_ghost_cmesh0");
   }
   if (partition_cmesh) {
     /* partition the initial cmesh according to a uniform forest */
     t8_cmesh_init (&cmesh_partition);
     t8_cmesh_set_derive (cmesh_partition, cmesh);
-    t8_cmesh_set_partition_uniform (cmesh_partition, level, t8_scheme_new_default_cxx ());
+    t8_cmesh_set_partition_uniform (cmesh_partition, level, t8_scheme_new_default ());
     t8_cmesh_commit (cmesh_partition, comm);
   }
   else {
@@ -133,9 +132,9 @@ t8_test_ghost_refine_and_partition (t8_cmesh_t cmesh, const int level, sc_MPI_Co
     cmesh_partition = cmesh;
   }
   if (!no_vtk) {
-    t8_cmesh_vtk_write_file (cmesh_partition, "test_ghost_cmesh1", 1.0);
+    t8_cmesh_vtk_write_file (cmesh_partition, "test_ghost_cmesh1");
   }
-  forest = t8_forest_new_uniform (cmesh_partition, t8_scheme_new_default_cxx (), level, 1, comm);
+  forest = t8_forest_new_uniform (cmesh_partition, t8_scheme_new_default (), level, 1, comm);
 
   /* adapt (if desired), partition and create ghosts for the forest */
   t8_forest_init (&forest_ghost);
@@ -145,7 +144,7 @@ t8_test_ghost_refine_and_partition (t8_cmesh_t cmesh, const int level, sc_MPI_Co
     /* Chose refinement function */
     switch (refine_method) {
     case REFINE_THIRD:
-      adapt_fn = t8_basic_adapt;
+      adapt_fn = t8_adapt_every_third_element;
       break;
     case REFINE_P8:
       adapt_fn = t8_refine_p8est;
@@ -213,19 +212,13 @@ t8_test_ghost_brick (int dim, int x, int y, int z, int periodic_x, int periodic_
                      sc_MPI_Comm comm, int ghost_version, int max_level, int no_vtk, refine_method_t refine_method)
 {
   t8_cmesh_t cmesh;
-  p4est_connectivity_t *conn4;
-  p8est_connectivity_t *conn8;
 
   if (dim == 2) {
-    conn4 = p4est_connectivity_new_brick (x, y, periodic_x, periodic_y);
-    cmesh = t8_cmesh_new_from_p4est (conn4, comm, 0);
-    p4est_connectivity_destroy (conn4);
+    cmesh = t8_cmesh_new_brick_2d (x, y, periodic_x, periodic_y, comm);
   }
   else {
     T8_ASSERT (dim == 3);
-    conn8 = p8est_connectivity_new_brick (x, y, z, periodic_x, periodic_y, periodic_z);
-    cmesh = t8_cmesh_new_from_p8est (conn8, comm, 0);
-    p8est_connectivity_destroy (conn8);
+    cmesh = t8_cmesh_new_brick_3d (x, y, z, periodic_x, periodic_y, periodic_z, comm);
   }
 
   t8_test_ghost_refine_and_partition (cmesh, level, comm, 1, ghost_version, max_level, no_vtk, refine_method);

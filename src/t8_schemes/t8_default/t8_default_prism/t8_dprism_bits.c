@@ -44,6 +44,12 @@ t8_dprism_copy (const t8_dprism_t *p, t8_dprism_t *dest)
 }
 
 int
+t8_dprism_equal (const t8_dprism_t *elem1, const t8_dprism_t *elem2)
+{
+  return t8_dline_equal (&elem1->line, &elem2->line) && t8_dtri_equal (&elem1->tri, &elem2->tri);
+}
+
+int
 t8_dprism_compare (const t8_dprism_t *p1, const t8_dprism_t *p2)
 {
   int maxlvl;
@@ -121,16 +127,14 @@ t8_dprism_child_id (const t8_dprism_t *p)
 int
 t8_dprism_is_familypv (t8_dprism_t **fam)
 {
-  t8_dtri_t **tri_fam = T8_ALLOC (t8_dtri_t *, T8_DTRI_CHILDREN);
-  t8_dline_t **line_fam = T8_ALLOC (t8_dline_t *, T8_DLINE_CHILDREN);
+  t8_dtri_t *tri_fam[T8_DPRISM_CHILDREN];
+  t8_dline_t *line_fam[T8_DLINE_CHILDREN];
 
   for (int i = 0; i < T8_DLINE_CHILDREN; i++) {
     for (int j = 0; j < T8_DTRI_CHILDREN; j++) {
       tri_fam[j] = &fam[j + i * T8_DTRI_CHILDREN]->tri;
     }
     if (!t8_dtri_is_familypv ((const t8_dtri_t **) tri_fam)) {
-      T8_FREE (tri_fam);
-      T8_FREE (line_fam);
       return 0;
     }
   }
@@ -145,21 +149,15 @@ t8_dprism_is_familypv (t8_dprism_t **fam)
           && (fam[i]->tri.type == fam[i + T8_DTRI_CHILDREN]->tri.type)
           && (fam[i]->tri.x == fam[i + T8_DTRI_CHILDREN]->tri.x)
           && (fam[i]->tri.y == fam[i + T8_DTRI_CHILDREN]->tri.y))) {
-      T8_FREE (tri_fam);
-      T8_FREE (line_fam);
       return 0;
     }
   }
 
   for (int i = 0; i < T8_DPRISM_CHILDREN; i++) {
     if (fam[i]->line.level != fam[i]->tri.level) {
-      T8_FREE (tri_fam);
-      T8_FREE (line_fam);
       return 0;
     }
   }
-  T8_FREE (tri_fam);
-  T8_FREE (line_fam);
   return 1;
 }
 
@@ -331,24 +329,24 @@ t8_dprism_children_at_face (const t8_dprism_t *p, int face, t8_dprism_t **childr
   T8_ASSERT (num_children == t8_dprism_num_face_children (p, face));
   T8_ASSERT (0 <= face && face < T8_DPRISM_FACES);
   if (face < 3) {
-    for (int ichild = 0; ichild < 4; ichild++) {
+    for (int ichild = 3; ichild >= 0; ichild--) {
       t8_dprism_child (p, children_at_face[p->tri.type][face * 4 + ichild], children[ichild]);
     }
   }
   else {
-    for (int ichild = 0; ichild < 4; ichild++) {
+    for (int ichild = 3; ichild >= 0; ichild--) {
       t8_dprism_child (p, (face % 3) * 4 + ichild, children[ichild]);
     }
   }
   /* Fill child-indices array */
   if (child_indices != NULL) {
     if (face < 3) {
-      for (int ichild = 0; ichild < 4; ichild++) {
+      for (int ichild = 3; ichild >= 0; ichild--) {
         child_indices[ichild] = children_at_face[p->tri.type][face * 4 + ichild];
       }
     }
     else {
-      for (int ichild = 0; ichild < 4; ichild++) {
+      for (int ichild = 3; ichild >= 0; ichild--) {
         child_indices[ichild] = (face % 3) * 4 + ichild;
       }
     }
@@ -389,15 +387,8 @@ t8_dprism_tree_face (const t8_dprism_t *p, int face)
   return face;
 }
 
-int
-t8_dprism_root_face_to_face (const t8_dprism_t *p, int root_face)
-{
-  T8_ASSERT (0 <= root_face && root_face < T8_DPRISM_FACES);
-  return root_face;
-}
-
 void
-t8_dprism_extrude_face (const t8_element_t *face, t8_element_t *elem, int root_face)
+t8_dprism_extrude_face (const t8_element_t *face, t8_element_t *elem, const int root_face)
 {
   t8_dprism_t *p = (t8_dprism_t *) elem;
   const t8_dtri_t *t = (const t8_dtri_t *) face;
@@ -425,7 +416,6 @@ t8_dprism_extrude_face (const t8_element_t *face, t8_element_t *elem, int root_f
     p->line.level = q->level;
     p->tri.level = q->level;
     p->tri.x = ((int64_t) q->x * T8_DTRI_ROOT_LEN) / P4EST_ROOT_LEN;
-    ;
     p->tri.y = 0;
     p->line.x = ((int64_t) q->y * T8_DLINE_ROOT_LEN) / P4EST_ROOT_LEN;
     break;
@@ -532,14 +522,14 @@ t8_dprism_corner_descendant (const t8_dprism_t *p, t8_dprism_t *s, int corner, i
 }
 
 void
-t8_dprism_vertex_coords (const t8_dprism_t *elem, const int vertex, int coords[3])
+t8_dprism_vertex_integer_coords (const t8_dprism_t *elem, const int vertex, int coords[3])
 {
   T8_ASSERT (vertex >= 0 && vertex < 6);
   T8_ASSERT (elem->line.level == elem->tri.level);
   /*Compute x and y coordinate */
-  t8_dtri_compute_coords (&elem->tri, vertex % 3, coords);
-  /*Compute z coordinatecoords[0] *= T8_DPRISM_ROOT_BY_DTRI_ROOT; */
-  t8_dline_vertex_coords (&elem->line, vertex / 3, &coords[2]);
+  t8_dtri_compute_integer_coords (&elem->tri, vertex % 3, coords);
+  /* Compute z coordinate coords[0] *= T8_DPRISM_ROOT_BY_DTRI_ROOT; */
+  t8_dline_vertex_integer_coords (&elem->line, vertex / 3, &coords[2]);
   coords[0] /= T8_DPRISM_ROOT_BY_DTRI_ROOT;
   coords[1] /= T8_DPRISM_ROOT_BY_DTRI_ROOT;
   coords[2] /= T8_DPRISM_ROOT_BY_DLINE_ROOT;
@@ -553,7 +543,7 @@ t8_dprism_vertex_ref_coords (const t8_dprism_t *elem, const int vertex, double c
   T8_ASSERT (vertex >= 0 && vertex < 6);
 
   /* Compute the integer coordinates in [0, root_len]^3 */
-  t8_dprism_vertex_coords (elem, vertex, coords_int);
+  t8_dprism_vertex_integer_coords (elem, vertex, coords_int);
 
   /* Divide by the root length. */
   coords[0] = coords_int[0] / (double) T8_DPRISM_ROOT_LEN;
@@ -593,9 +583,7 @@ t8_dprism_linear_id (const t8_dprism_t *p, int level)
   }
 
   lines_at_level = sc_intpow64u (T8_DLINE_CHILDREN, level - 1);
-  /* *INDENT-OFF* */
   prism_shift = (T8_DPRISM_CHILDREN / T8_DLINE_CHILDREN) * sc_intpow64u (T8_DPRISM_CHILDREN, level - 1);
-  /* *INDENT-ON* */
   tri_id = t8_dtri_linear_id (&p->tri, level);
   line_id = t8_dline_linear_id (&p->line, level);
   for (i = 0; i < level; i++) {
@@ -630,11 +618,4 @@ t8_dprism_is_valid (const t8_dprism_t *p)
   const t8_dtri_t *tri = &p->tri;
   const int same_level = line->level == tri->level;
   return t8_dtri_is_valid (tri) && t8_dline_is_valid (line) && same_level;
-}
-
-void
-t8_dprism_debug_print (const t8_dprism_t *p)
-{
-  t8_dtri_debug_print (&p->tri);
-  t8_dline_debug_print (&p->line);
 }

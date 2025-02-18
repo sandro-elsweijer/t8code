@@ -66,9 +66,9 @@ T8_EXTERN_C_BEGIN ();
  *
  * Tree faces:
  *
- * The data of Tree faces looks for each tree:
+ * For each tree the data of the tree faces (where F is the number of faces of the tree) looks like this:
  *
- * | Treeid1 Treeid2  ... | ttf1 ttf2 ... | padding |
+ * | Treeid1 Treeid2  ... TreeidF | ttf1 ttf2 ... ttfN | padding |
  *
  * Where padding is a number of unused bytes that makes the whole block a multiple
  * of 4 Bytes.
@@ -80,7 +80,7 @@ T8_EXTERN_C_BEGIN ();
  *
  * Ghost faces:
  *
- * | Treeid1 Treeid2 ... | ttf1 ttf2 ... | padding |
+ * | Treeid1 Treeid2 ... TreeidF | ttf1 ttf2 ... ttfF | padding |
  *
  * Where padding is a number of unused bytes that makes the whole block a multiple
  * of sizeof (void*) Bytes.
@@ -90,14 +90,15 @@ T8_EXTERN_C_BEGIN ();
  * class of the tree.
  * Tree attributes:
  *
- * The data of Tree attributes looks like:
+ * The data of Tree attributes looks like, where N is the total number of attributes:
+ * The Attributes do not necessarily need to be sorted in a particular way, as they are
+ * accessed by offsets in the Att_descr.
  *
- * TODO: This description seems incomplete. Why is it not Attij_data?
- *
- * | Att00_descr | Att01_descr | ... | Att10_descr | ... | Attrend_descr | Att1_data | Att2_data | ... |
+ * | Att00_descr | Att01_descr | ... Att0 A_0_descr| Att10_descr | ... | AttrT A_T | Att0_data | Att2_data | ... AttN_data|
  *                TODO: maybe insert padding here ||
  * Where Attij_descr is a descriptor of the j-th attribute data of tree i storing
- * - an offset to Atti_data starting from Atti0_descr
+ * - an offset to Attk_data starting from Attij_descr, where k is the index in the dataarray.
+ *    The actual data is put there in the order of the attribute descriptors, but this is not necessitated by the layout.
  * - package id of the attribute (int)
  * - key of the attribute (int)
  * The data type is t8_attribute_info_struct_t
@@ -120,14 +121,14 @@ T8_EXTERN_C_BEGIN ();
 /* TODO: document */
 
 /* Given a tree return the beginning of its attributes block */
-#define T8_TREE_FIRST_ATT(t) ((char *) (t) + (t)->att_offset)
+#define T8_TREE_FIRST_ATT_INFO(t) ((char *) (t) + (t)->att_offset)
 
 /* Given a tree and an index i return the i-th attribute index of that tree */
 #define T8_TREE_ATTR_INFO(t, i) \
   ((t8_attribute_info_struct_t *) ((char *) (t) + (t)->att_offset + (i) * sizeof (t8_attribute_info_struct_t)))
 
 /* Given a tree and an attribute info return the attribute */
-#define T8_TREE_ATTR(t, ai) (T8_TREE_FIRST_ATT (t) + (ai)->attribute_offset)
+#define T8_TREE_ATTR(t, ai) (T8_TREE_FIRST_ATT_INFO (t) + (ai)->attribute_offset)
 
 /* Given a tree return its face_neighbor array */
 #define T8_TREE_FACE(t) ((char *) (t) + (t)->neigh_offset)
@@ -136,7 +137,7 @@ T8_EXTERN_C_BEGIN ();
 #define T8_TREE_TTF(t) (T8_TREE_FACE (t) + t8_eclass_num_faces[(t)->eclass] * sizeof (t8_locidx_t))
 
 /* Given a ghost return the beginning of its attribute block */
-#define T8_GHOST_FIRST_ATT(g) T8_TREE_FIRST_ATT (g)
+#define T8_GHOST_FIRST_ATT_INFO(g) T8_TREE_FIRST_ATT_INFO (g)
 
 /* Given a ghost and an index i return the i-th attribute index of that ghost */
 #define T8_GHOST_ATTR_INFO(g, i) T8_TREE_ATTR_INFO (g, i)
@@ -179,7 +180,7 @@ t8_cmesh_trees_init (t8_cmesh_trees_t *ptrees, int num_procs, t8_locidx_t num_tr
  * \return                    The part number \a proc of \a trees.
  */
 t8_part_tree_t
-t8_cmesh_trees_get_part (t8_cmesh_trees_t trees, int proc);
+t8_cmesh_trees_get_part (const t8_cmesh_trees_t trees, const int proc);
 
 /* !!! This does only allocate memory for the trees and ghosts
  *     not yet for the face data and the attributes. See below !!!
@@ -219,7 +220,7 @@ t8_cmesh_trees_start_part (t8_cmesh_trees_t trees, int proc, t8_locidx_t lfirst_
  * \param [in,out]        trees The trees structure to be updated.
  * \param [in]            proc  The number of the part to be finished.
  */
-size_t
+void
 t8_cmesh_trees_finish_part (t8_cmesh_trees_t trees, int proc);
 
 /** Copy the tree_to_proc and ghost_to_proc arrays of one tree structure to
@@ -407,8 +408,8 @@ t8_cmesh_trees_init_attributes (t8_cmesh_trees_t trees, t8_locidx_t ltree_id, si
  *                    does not exist.
  */
 void *
-t8_cmesh_trees_get_attribute (t8_cmesh_trees_t trees, t8_locidx_t ltree_id, int package_id, int key, size_t *size,
-                              int is_ghost);
+t8_cmesh_trees_get_attribute (const t8_cmesh_trees_t trees, const t8_locidx_t ltree_id, const int package_id,
+                              const int key, size_t *size, int is_ghost);
 
 /** Return the total size of all attributes stored at a specified tree.
  * \param [in]        tree  A tree structure.
@@ -429,19 +430,29 @@ t8_cmesh_trees_ghost_attribute_size (t8_cghost_t ghost);
 /* attr_tree_index is index of attr in tree's attribute array.
  * We assume that the attributes are already sorted! */
 void
-t8_cmesh_trees_add_attribute (t8_cmesh_trees_t trees, int proc, t8_stash_attribute_struct_t *attr, t8_locidx_t tree_id,
-                              size_t index);
+t8_cmesh_trees_add_attribute (const t8_cmesh_trees_t trees, int proc, const t8_stash_attribute_struct_t *attr,
+                              t8_locidx_t tree_id, size_t index);
+
+/** Add the next ghost attribute from stash to the correct position in the char pointer structure
+ * Since it is created from stash, all attributes are added to part 0.
+ * The following attribute offset gets updated already.
+ * \param [in,out]    trees The trees structure, whose char array is updated.
+ * \param [in]        attr The stash attribute that is added.
+ * \param [in]        local_ghost_id The local ghost id.
+ * \param [in]        ghosts_inserted The number of ghost that were already inserted, so that we do not write over the end.
+ * \param [in]        index The attribute index of the attribute to be added.
+*/
 
 void
-t8_cmesh_trees_add_ghost_attribute (t8_cmesh_trees_t trees, int proc, t8_stash_attribute_struct_t *attr,
-                                    t8_locidx_t local_ghost_id, size_t index, size_t *attribute_data_offset);
+t8_cmesh_trees_add_ghost_attribute (const t8_cmesh_trees_t trees, const t8_stash_attribute_struct_t *attr,
+                                    t8_locidx_t local_ghost_id, t8_locidx_t ghosts_inserted, size_t index);
 
 /** Return the number of parts of a trees structure.
  * \param [in]        trees The trees structure.
  * \return            The number of parts in \a trees.
  */
 size_t
-t8_cmesh_trees_get_numproc (t8_cmesh_trees_t trees);
+t8_cmesh_trees_get_numproc (const t8_cmesh_trees_t trees);
 
 /** Compute the tree-to-face information given a face and orientation value
  *  of a face connection.

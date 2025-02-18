@@ -20,14 +20,14 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <t8_cmesh_vtk_writer.h>
+#include <t8_vtk/t8_vtk_writer.h>
 
 /* Create a coarse mesh that is partitioned across two processes
  * (if mpisize >= 2).
  *
  * To keep the example short, we only create the connectivity and
  * do not equip this cmesh with coordinates.
- * See the other examples or the t8_cmesh_new_ function in t8_cmesh.c
+ * See the other examples or the t8_cmesh_new_function in t8_cmesh.cxx
  * for coordinate handling.
  */
 void

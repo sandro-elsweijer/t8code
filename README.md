@@ -1,8 +1,5 @@
-
-
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7034838.svg)](https://doi.org/10.5281/zenodo.7034838)
-[![t8code tests serial](https://github.com/DLR-AMR/t8code/actions/workflows/tests_t8code_serial.yml/badge.svg)](https://github.com/DLR-AMR/t8code/actions/workflows/tests_t8code_serial.yml)
-[![t8code tests parallel](https://github.com/DLR-AMR/t8code/actions/workflows/tests_t8code_parallel.yml/badge.svg)](https://github.com/DLR-AMR/t8code/actions/workflows/tests_t8code_parallel.yml)
+[![t8code CI](https://github.com/DLR-AMR/t8code/actions/workflows/tests_cmake_testsuite.yml/badge.svg)](https://github.com/DLR-AMR/t8code/actions/workflows/tests_cmake_testsuite.yml)
 
 <p align="center">
   <img width="300px" src=t8code_logo.png>
@@ -42,13 +39,13 @@ Among others, t8code offers the following functionalities:
 - (Re-)partition a mesh (and associated data) among MPI ranks
 - Manage ghost (halo) elements and data
 - Hierarchical search in the mesh
-
+- Curved mesh elements
 
 t8code uses space-filling curves (SFCs) to manage the adaptive refinement and efficiently store the mesh elements and associated data.
 A modular approach makes it possible to exchange the underlying SFC without changing the high-level algorithms.
 Thus, we can use and compare different refinement schemes and users can implement their own refinement rules if so desired.
 
-Currently, 
+Currently t8code offers the following implementations by default:
   - lines use a 1D Morton curve with 1:2 refinement
   - quadrilateral/hexahedral elements are inherited from the p4est submodule, using the Morton curve 1:4, 1:8 refinement; 
   - triangular/tetrahedral are implemented using the Tetrahedral Morton curve, 1:4, 1:8 refinement;
@@ -68,7 +65,7 @@ We provide a short guide to install t8code in our Wiki [Installation guide](http
 ### Getting started
   
   To get familiar with t8code and its algorithms and data structures we recommend executing the tutorial examples in `tutorials`
-  and read the corresponding Wiki pages starting with [Step 0 - Helloworld](https://github.com/holke/t8code/wiki/Step-0---Hello-World).
+  and read the corresponding Wiki pages starting with [Step 0 - Helloworld](https://github.com/DLR-AMR/t8code/wiki/Step-0---Hello-World).
   
   A sophisticated example of a complete numerical simulation is our finite volume solver of the advection equation in `example/advection`.
 
@@ -85,7 +82,19 @@ and then find the generated files in the `/doc` subfolder.
 
 You can also find the documentation of our releases on the [t8code website](https://dlr-amr.github.io/t8code/pages/documentation.html).
 
-### Julia Wrapper
+### License and contributing
+t8code is licensed under GPLv2 (see [COPYING](COPYING)). We appreciate
+contributions from the community and refer to [CONTRIBUTING.md](CONTRIBUTING.md)
+for more details.
+
+Note that we strive to be a friendly, inclusive open-source
+community and ask all members of our community to adhere to our
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). 
+
+To get in touch, [open an issue](https://github.com/DLR-AMR/t8code/issues/new)
+or write an email to one of the principal developers.
+
+### Julia wrapper
 
 We offer [T8code.jl](https://github.com/DLR-AMR/T8code.jl) - an official
 [Julia](https://julialang.org/) package allowing to call t8code routines from
@@ -125,6 +134,9 @@ to install the package on your system.
   [6] **Geometry controlled refinement for hexahedra**:
   Elsweijer, Sandro and Holke, Johannes and Kleinert, Jan and Reith, Dirk  (2022) *Constructing a Volume Geometry Map for Hexahedra with Curved Boundary Geometries*.   In: SIAM International Meshing Roundtable Workshop 2022.  SIAM International Meshing Roundtable Workshop 2022, 22. - 25. Feb. 2022, [Full text available](https://elib.dlr.de/186570/1/ConstructingAVolumeGeometryMapForHexahedraWithCurvedBoundaryGeometries.pdf) 
   
+  [7] **JOSS entry**:
+  Holke, Johannes and Markert, Johannes, et. al. (2025) *t8code - modular adaptive mesh refinement in the exascale era*. In: Journal of Open Source Software, [Full text available](https://www.theoj.org/joss-papers/joss.06887/10.21105.joss.06887.pdf)
+ 
 ### Theses with t8code relations
 
   An (incomplete) list of theses written with or about t8code:
@@ -171,6 +183,13 @@ to install the package on your system.
   Lilikakis, Ioannis  (2022) *Algorithms for tree-based adaptive meshes with incomplete trees*.  Master's thesis, Universität zu Köln.    
  [Full text may be available in future](https://elib.dlr.de/191968/)
  
+  [J] **Curved tetrahedra**:
+  Fussbroich Jakob (2023) *Towards high-order, hybrid adaptive mesh refinement: Implementation and evaluation of curved unstructured mesh elements*. Master's thesis. Technische Hochschule Köln.
+  [Full text available](https://elib.dlr.de/200442/)
+
+  [K] **Hanging node resolution 3D**:
+  Tabea Leistikow (2024) *Derivation and implementation of a hanging nodes resolution scheme for hexahedral non-conforming meshes in t8code*. Master's thesis, Universität zu Köln.
+  Full text currently not available.
 
   ### Citing t8code
   
@@ -178,6 +197,7 @@ to install the package on your system.
 - **the tetrahedral index**, please cite [3].
 - **coarse mesh partitioning**, please cite [4].
 - **construction and handling of the ghost layer**, please cite [5].
-- **geometry controlled refinement**, please cite [6]
+- **geometry controlled refinement**, please cite [6] (general) and [J] (tetrahedral).
+- **hanging node resolution and/or subelements**, please cite [E] and [K].
 
 If you use any functionality described in the theses, we encourage you to cite them as well.

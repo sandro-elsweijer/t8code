@@ -22,35 +22,45 @@
 
 #include <t8_geometry/t8_geometry_implementations/t8_geometry_analytic.hxx>
 
-t8_geometry_analytic::t8_geometry_analytic (int dim, const char *name_in, t8_geom_analytic_fn analytical,
+t8_geometry_analytic::t8_geometry_analytic (std::string name, t8_geom_analytic_fn analytical,
                                             t8_geom_analytic_jacobian_fn jacobian_in,
-                                            t8_geom_load_tree_data_fn load_tree_data_in, const void *user_data_in)
+                                            t8_geom_load_tree_data_fn load_tree_data_in,
+                                            t8_geom_tree_negative_volume_fn tree_negative_volume_in,
+                                            t8_geom_tree_compatible_fn tree_compatible_in, const void *user_data_in)
+  : t8_geometry (name)
 {
-  T8_ASSERT (0 <= dim && dim <= 3);
-
-  name = name_in;
-  dimension = dim;
-
   analytical_function = analytical;
   jacobian = jacobian_in;
   load_tree_data = load_tree_data_in;
+  tree_negative_volume = tree_negative_volume_in;
+  tree_compatible = tree_compatible_in;
   user_data = user_data_in;
+}
+
+t8_geometry_analytic::t8_geometry_analytic (std::string name): t8_geometry (name)
+{
+  analytical_function = NULL;
+  jacobian = NULL;
+  load_tree_data = NULL;
+  tree_negative_volume = NULL;
+  tree_compatible = NULL;
+  user_data = NULL;
 }
 
 void
 t8_geometry_analytic::t8_geom_evaluate (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const double *ref_coords,
-                                        double out_coords[3]) const
+                                        const size_t num_coords, double *out_coords) const
 {
   T8_ASSERT (analytical_function != NULL);
-  analytical_function (cmesh, gtreeid, ref_coords, out_coords, tree_data, user_data);
+  analytical_function (cmesh, gtreeid, ref_coords, num_coords, out_coords, tree_data, user_data);
 }
 
 void
 t8_geometry_analytic::t8_geom_evaluate_jacobian (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const double *ref_coords,
-                                                 double *jacobian_out) const
+                                                 const size_t num_coords, double *jacobian_out) const
 {
   T8_ASSERT (jacobian != NULL);
-  jacobian (cmesh, gtreeid, ref_coords, jacobian_out, tree_data, user_data);
+  jacobian (cmesh, gtreeid, ref_coords, num_coords, jacobian_out, tree_data, user_data);
 }
 
 void
@@ -66,10 +76,58 @@ t8_geometry_analytic::t8_geom_load_tree_data (t8_cmesh_t cmesh, t8_gloidx_t gtre
   }
 }
 
+bool
+t8_geometry_analytic::t8_geom_tree_negative_volume () const
+{
+  if (tree_negative_volume != NULL) {
+    /* Tree negative volume if a loading function was provided. */
+    return tree_negative_volume ();
+  }
+  else {
+    return false;
+  }
+}
+
+bool
+t8_geometry_analytic::t8_geom_check_tree_compatibility () const
+{
+  if (tree_compatible != NULL) {
+    /* tree_compatible if a loading function was provided. */
+    return tree_compatible ();
+  }
+  else {
+    return true;
+  }
+}
+
+T8_EXTERN_C_BEGIN ();
+
 void
-t8_geom_load_tree_data_vertices (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const void **vertices_out)
+t8_geometry_analytic_destroy (t8_geometry_c **geom)
+{
+  T8_ASSERT (geom != NULL);
+
+  delete *geom;
+  *geom = NULL;
+}
+
+t8_geometry_c *
+t8_geometry_analytic_new (const char *name, t8_geom_analytic_fn analytical, t8_geom_analytic_jacobian_fn jacobian,
+                          t8_geom_load_tree_data_fn load_tree_data,
+                          t8_geom_tree_negative_volume_fn tree_negative_volume,
+                          t8_geom_tree_compatible_fn tree_compatible, const void *user_data)
+{
+  t8_geometry_analytic *geom = new t8_geometry_analytic (name, analytical, jacobian, load_tree_data,
+                                                         tree_negative_volume, tree_compatible, user_data);
+  return (t8_geometry_c *) geom;
+}
+
+void
+t8_geom_load_tree_data_vertices (t8_cmesh_t cmesh, t8_gloidx_t gtreeid, const void **user_data)
 {
   T8_ASSERT (t8_cmesh_is_committed (cmesh));
   t8_locidx_t ltreeid = t8_cmesh_get_local_id (cmesh, gtreeid);
-  *vertices_out = t8_cmesh_get_tree_vertices (cmesh, ltreeid);
+  *user_data = t8_cmesh_get_tree_vertices (cmesh, ltreeid);
 }
+
+T8_EXTERN_C_END ();
