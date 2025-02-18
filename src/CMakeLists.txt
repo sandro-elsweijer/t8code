@@ -64,6 +64,8 @@ if( T8CODE_ENABLE_OCC )
     target_link_libraries( T8 PUBLIC ${OpenCASCADE_LIBRARIES} )
 endif()
 
+target_link_libraries(T8 PUBLIC GSL::gsl GSL::gslcblas)
+
 if( T8CODE_ENABLE_LESS_TESTS )
     target_compile_definitions( T8 PUBLIC T8_ENABLE_LESS_TESTS=1 )
 endif()
@@ -163,6 +165,11 @@ target_sources( T8 PRIVATE
     t8_vtk/t8_vtk_writer.cxx
     t8_vtk/t8_vtk_write_ASCII.cxx
     t8_vtk/t8_vtk_writer_helper.cxx
+    t8_msa/basis_functions.cxx
+    t8_msa/dunavant.cxx
+    t8_msa/mask_coefficients.cxx
+    t8_msa/vecmat.cxx
+    t8_msa/wavelet.cxx
 )
 
 target_compile_definitions( T8 PUBLIC T8_CMAKE_BUILD )

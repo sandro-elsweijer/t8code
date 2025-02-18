@@ -12,7 +12,7 @@ function( add_t8_tutorial )
     set(TUTORIAL_BUILD_DIR "${CMAKE_BINARY_DIR}/${TUTORIAL_RELATIVE_DIR}")
 
     add_executable( ${ADD_T8_TUTORIAL_NAME} ${ADD_T8_TUTORIAL_SOURCES} )
-    target_link_libraries( ${ADD_T8_TUTORIAL_NAME} PRIVATE T8 SC::SC )
+    target_link_libraries( ${ADD_T8_TUTORIAL_NAME} PRIVATE T8 SC::SC GSL::gsl GSL::gslcblas )
     target_include_directories( ${ADD_T8_TUTORIAL_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/.. )
     
     set_target_properties(${ADD_T8_TUTORIAL_NAME} PROPERTIES
@@ -44,6 +44,7 @@ add_t8_tutorial( NAME t8_step7_interpolation            SOURCES general/t8_step7
 add_t8_tutorial( NAME t8_tutorial_build_cmesh           SOURCES general/t8_tutorial_build_cmesh.cxx general/t8_tutorial_build_cmesh_main.cxx)
 add_t8_tutorial( NAME t8_tutorial_search                SOURCES general/t8_tutorial_search.cxx general/t8_step3_adapt_forest.cxx )
 add_t8_tutorial( NAME t8_features_curved_meshes         SOURCES features/t8_features_curved_meshes.cxx)
+add_t8_tutorial( NAME t8_thesis_mesh                    SOURCES thesis/thesis_mesh.cxx )
 
 copy_tutorial_file (features/t8_features_curved_meshes_generate_cmesh_hex.geo)
 copy_tutorial_file (features/t8_features_curved_meshes_generate_cmesh_quad.geo)
